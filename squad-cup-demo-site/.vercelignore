@@ -1,0 +1,7 @@
+*.md
+engine.test.js
+package.json
+.vercel
+.env*
+.gitignore
+supabase/

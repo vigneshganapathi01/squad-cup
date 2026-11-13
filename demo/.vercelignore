@@ -1,0 +1,4 @@
+*.md
+.vercel
+.env*
+demo-seed.js

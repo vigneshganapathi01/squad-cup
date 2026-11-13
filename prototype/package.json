@@ -1,0 +1,1 @@
+{"name":"squad-cup-prototype","private":true,"type":"commonjs","scripts":{"test":"node engine.test.js"}}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Squad Cup</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Cdefs%3E%3ClinearGradient id=%27g%27 x1=%270%27 y1=%270%27 x2=%271%27 y2=%271%27%3E%3Cstop offset=%270%27 stop-color=%27%23fde68a%27/%3E%3Cstop offset=%271%27 stop-color=%27%23b45309%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27url(%23g)%27/%3E%3Ctext x=%2732%27 y=%2742%27 font-family=%27Arial,sans-serif%27 font-size=%2726%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27%23130b00%27%3ESC%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&family=Teko:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css?v=20261130">
+</head>
+<body>
+<div class="stage-art" aria-hidden="true"></div>
+<div class="frame">
+<header class="top">
+  <a class="brand" href="#/"><span class="logo">SC</span> <span id="brandName">Squad Cup</span></a>
+  <div class="top-title" id="topTitle">Tournament</div>
+  <a href="#/staff" class="staff">+ Staff</a>
+</header>
+<aside class="rail" aria-label="Sections">
+  <a href="#/" data-r="" title="Register" class="rail-reg"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg><span class="rail-lbl">Register</span></a>
+  <a href="#/overview" data-r="overview" title="Overview"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10h-6v-6H9v6H3z"/></svg><span class="rail-lbl">Overview</span></a>
+  <a href="#/groups" data-r="groups" title="Group Stage"><svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-8 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm0 2c-2.7 0-8 1.3-8 4v3h8v-3c0-1.1.4-2.1 1.2-3A11 11 0 0 0 8 13zm8 0c-2.7 0-8 1.3-8 4v3h16v-3c0-2.7-5.3-4-8-4z"/></svg><span class="rail-lbl">Group Stage</span></a>
+  <a href="#/schedule" data-r="schedule" title="Matches"><svg viewBox="0 0 24 24"><path d="M7 2h2v2h6V2h2v2h3v18H4V4h3zm-1 8v10h12V10z"/></svg><span class="rail-lbl">Matches</span></a>
+  <i></i>
+  <a href="#/leaderboard" data-r="leaderboard" title="Standings"><svg viewBox="0 0 24 24"><path d="M18 2H6v2H2v3a4 4 0 0 0 4 4h.3A6 6 0 0 0 11 14.9V18H8v2h8v-2h-3v-3.1a6 6 0 0 0 4.7-3.9H18a4 4 0 0 0 4-4V4h-4zM4 7V6h2v3a2 2 0 0 1-2-2zm16 0a2 2 0 0 1-2 2V6h2z"/></svg><span class="rail-lbl">Standings</span></a>
+  <a href="#/bracket" data-r="bracket" title="Bracket"><svg viewBox="0 0 24 24"><path d="M3 3h7v5H3zm0 13h7v5H3zm11-6.5h7v5h-7zM10 5.5h2v13h-2v-1.5h0V7h0zM12 11h2v2h-2z"/></svg><span class="rail-lbl">Bracket</span></a>
+  <a href="#/info" data-r="info" title="Rules"><svg viewBox="0 0 24 24"><path d="M6 2h11l3 3v17H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm2 6v2h8V8zm0 4v2h8v-2zm0 4v2h5v-2z"/></svg><span class="rail-lbl">Rules</span></a>
+  <i></i>
+  <a href="#/my-team" data-r="my-team" title="My Team"><svg viewBox="0 0 24 24"><path d="M7 6h10a5 5 0 0 1 5 5v2a5 5 0 0 1-8.6 3.5L12 15l-1.4 1.5A5 5 0 0 1 2 13v-2a5 5 0 0 1 5-5zm0 3v2H5v2h2v2h2v-2h2v-2H9V9zm9.5 1a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5zm-2 3a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5z"/></svg><span class="rail-lbl">My Team</span></a>
+  <a href="#/staff" data-r="staff" title="Staff" class="rail-staff"><svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z"/></svg><span class="rail-lbl">Staff login</span></a>
+  <span class="rail-v">v 1.0</span>
+</aside>
+<main id="app"></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<footer class="foot">Community tournament for Free Fire players · Not affiliated with Garena · <span id="modeNote"></span></footer>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="config.js?v=20261130"></script>
+<script src="engine.js?v=20261130"></script>
+<script src="cloud.js?v=20261130"></script>
+<script src="app.js?v=20261130"></script>
+</body>
+</html>

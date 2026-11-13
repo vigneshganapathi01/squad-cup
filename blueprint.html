@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tournament Prototype Blueprint</title>
+<style>
+:root{--bg:#f5f6f8;--surface:#fff;--ink:#17202b;--muted:#667085;--line:#e5e8ed;--blue:#3867e8;--teal:#0e9b83;--amber:#d88b19;--red:#d1433a;--soft-blue:#edf2ff;--soft-teal:#e8f7f3;--soft-amber:#fff5e5;--soft-red:#fdeeed}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1180px;margin:auto;padding:28px 22px 70px}
+.hero{background:linear-gradient(125deg,#142744,#203d68 65%,#315b83);color:#fff;border-radius:24px;padding:42px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:750;color:#b9c9e3}
+h1{font-size:clamp(28px,5vw,44px);line-height:1.1;letter-spacing:-.03em;margin:14px 0}
+.hero p{max-width:760px;color:#d5deeb;margin:0}
+.pill{display:inline-block;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:5px 11px;font-size:12px;margin:18px 6px 0 0}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 28px}
+nav a{font-size:12px;text-decoration:none;color:#475467;background:#fff;border:1px solid var(--line);padding:7px 12px;border-radius:999px}
+nav a:hover{border-color:var(--blue);color:var(--blue)}
+section{margin:38px 0;scroll-margin-top:16px}
+.kicker{font-size:11px;text-transform:uppercase;letter-spacing:.13em;color:var(--blue);font-weight:800}
+h2{font-size:24px;letter-spacing:-.02em;margin:4px 0 6px}
+h3{font-size:16px;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 16px;max-width:780px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 8px 28px rgba(18,31,53,.05)}
+.grid{display:grid;gap:14px}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.small{font-size:13px;color:var(--muted)}
+ul{padding-left:18px;margin:6px 0}li{margin:4px 0;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:.07em;background:#fafbfc}
+tr:last-child td{border-bottom:0}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:13px;background:#fff}
+.badge{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;background:#eef1f5;color:#475467}
+.b-p{background:var(--soft-teal);color:#087b68}.b-l{background:var(--soft-amber);color:#9a620c}
+.note{border-left:3px solid var(--amber);background:#fff9ee;padding:13px 15px;border-radius:0 10px 10px 0;color:#6b5127;font-size:14px}
+.warn{border-left:3px solid var(--red);background:var(--soft-red);padding:13px 15px;border-radius:0 10px 10px 0;color:#7a2a24;font-size:14px}
+.code{background:#111c2d;color:#dce7f7;border-radius:13px;padding:17px;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}
+.flow span{background:var(--soft-blue);border:1px solid #d8e2ff;border-radius:8px;padding:6px 9px}
+.flow i{color:#98a2b3;font-style:normal}
+.step{display:flex;gap:14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin:10px 0}
+.step .n{flex:none;width:32px;height:32px;border-radius:50%;background:var(--soft-blue);color:var(--blue);display:grid;place-items:center;font-weight:800;font-size:13px}
+.step p{margin:4px 0 0;font-size:14px;color:#475467}
+.form{max-width:520px;background:#fff;border:1px solid var(--line);border-top:8px solid var(--blue);border-radius:12px;padding:18px}
+.form .f{border:1px solid #d8dde5;border-radius:8px;padding:8px 11px;margin:5px 0;color:#98a2b3;font-size:13px}
+.form h4{margin:14px 0 4px;font-size:13px}
+.btn{display:inline-block;background:var(--blue);color:#fff;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;margin-top:10px}
+footer{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px;margin-top:45px}
+@media(max-width:800px){.three{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.wrap{padding:14px 16px 45px}.two,.three{grid-template-columns:1fr}.hero{padding:28px 22px}.step{padding:13px}}
+@media print{nav{display:none}.card,.step{box-shadow:none;break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <div class="eyebrow">Prototype blueprint · v5 · 3 Nov 2026</div>
+  <h1>Free Fire Tournament Platform<br>Registration, Team Dashboard & Admin</h1>
+  <p>No sign-up for players. The site opens straight on a simple registration form (like a Google Form). Teams register 4 players, get a Team ID, and follow their matches with Team ID + captain mobile. Only staff log in.</p>
+  <span class="pill">Form-style registration</span><span class="pill">No player accounts</span><span class="pill">Team dashboard</span><span class="pill">Admin dashboard</span><span class="pill">Room creator panel</span><span class="pill">Live leaderboard</span>
+</header>
+<nav>
+  <a href="#example">1 Full flow example</a><a href="#scope">2 Scope</a><a href="#roles">3 Who uses it</a><a href="#form">4 Registration form</a><a href="#screens">5 Screens</a><a href="#team">6 Team dashboard</a><a href="#admin">7 Admin dashboard</a><a href="#room">8 Room creator</a><a href="#rules">9 Rules, points & stages</a><a href="#data">10 Database</a><a href="#api">11 Actions</a><a href="#status">12 Status flows</a><a href="#security">13 Security & fair play</a><a href="#legal">14 Legal</a><a href="#tech">15 Tech</a><a href="#plan">16 Build plan</a><a href="#decide">17 Decisions</a>
+</nav>
+
+<section id="example">
+  <div class="kicker">01 / Easy example</div><h2>The whole flow, step by step</h2>
+  <p class="sub">Tournament: <b>Chennai Squad Cup</b> · <b>252 slots</b> (set by the admin) · <b>6 Wild Card teams</b> added by the admin. We follow one team: <b>Team Thunder</b> (Ravi, Arun, Karthik, Vijay).</p>
+
+  <div class="step"><div class="n">1</div><div><b>Open the link and fill the form</b><p>Ravi opens the tournament link. The registration form opens straight away, with no sign-up. He types the team name "Team Thunder" and the 4 players' <b>name, mobile, email and Free Fire UID</b>. Ravi is Player 1, so he is the captain and contact.</p></div></div>
+  <div class="step"><div class="n">2</div><div><b>The system checks and gives a Team ID</b><p>It checks that every field is filled, mobiles have 10 digits, emails are valid, and no UID is already in another team. After submitting, Ravi sees <b>Team ID: FF-0427</b> and the status <b>Pending</b>. He saves it and shares it with his team.</p></div></div>
+  <div class="step"><div class="n">3</div><div><b>Admin approves</b><p>The admin sees all registrations in one table. Problems are flagged automatically (for example, the same UID used twice). The admin approves Team Thunder, and the status changes to <b>Approved ✅</b>.</p></div></div>
+  <div class="step"><div class="n">4</div><div><b>Groups are made automatically</b><p>All 252 slots are filled, and every group has 12 teams, so 252 ÷ 12 = <b>21 groups</b> (A to U). Team Thunder lands in <b>Group C, Slot 7</b>. The admin can swap teams if needed, then locks and publishes the groups.</p></div></div>
+  <div class="step"><div class="n">5</div><div><b>Team opens its dashboard</b><p>Anyone in the team opens "My Team" and enters <b>FF-0427 + Ravi's mobile</b>. They see: Group C · Slot 7 · Match 1 today at 7:00 PM.</p></div></div>
+  <div class="step"><div class="n">6</div><div><b>Check-in and room details</b><p>Check-in opens at 6:30 PM and Ravi taps <b>Check in</b>. At 6:45 PM the room creator posts <b>Room ID 1234567 · Password ff22</b>. Only checked-in Group C teams can see them. The players join the custom room in Free Fire and play.</p></div></div>
+  <div class="step"><div class="n">7</div><div><b>Results and points</b><p>The room creator enters each team's position and kills and uploads screenshots. Team Thunder finished <b>2nd (9 points) + 7 kills (7 points) = 16 points</b>. The admin checks the screenshots and approves, and the leaderboard updates live. Each group plays 6 matches, and the points add up.</p></div></div>
+  <div class="step"><div class="n">8</div><div><b>Qualify, stage by stage</b><p>The admin approves who goes through, and the next stage's groups are made automatically.</p>
+    <div class="tw" style="margin-top:8px"><table><thead><tr><th>Stage</th><th>Teams</th><th>Groups</th><th>Who goes through</th><th>Next</th></tr></thead><tbody>
+      <tr><td>Main Stage 1</td><td>252</td><td>21</td><td>Top 8 of each group</td><td>168</td></tr>
+      <tr><td>Main Stage 2</td><td>168</td><td>14</td><td>Top 6</td><td>84</td></tr>
+      <tr><td>Main Stage 3</td><td>84</td><td>7</td><td>Top 6</td><td>42</td></tr>
+    </tbody></table></div></div></div>
+  <div class="step"><div class="n">9</div><div><b>Admin picks 6 Wild Card teams</b><p>The admin chooses 6 special teams (for example creators, YouTubers or invited teams) and types their 4 players into the Wild Card screen. They don't play Stages 1–3.</p></div></div>
+  <div class="step"><div class="n">10</div><div><b>Wild Cards enter at Stage 4</b><p><b>42 qualified teams + 6 Wild Cards = 48 teams</b> in 4 groups. The admin chooses which group and slot each Wild Card goes into. Wild Card teams keep a "WC" tag. Stage 4: 48 → 24, then Stage 5: 24 → <b>12</b>.</p></div></div>
+  <div class="step"><div class="n">11</div><div><b>Grand Final, over 2 days</b><p>The 12 teams play 6 matches on Day 1 and 6 on Day 2. Points carry over, and the highest total after 12 matches is the 🏆 <b>Champion</b>. If two teams are tied, the winner is decided by most Booyahs, then position points, then kills.</p></div></div>
+</section>
+
+<section id="scope">
+  <div class="kicker">02</div><h2>What the prototype includes</h2>
+  <div class="grid two">
+    <div class="card"><h3>Build now <span class="badge b-p">Prototype</span></h3><ul>
+      <li>Form-style registration page (the first page of the site)</li>
+      <li>Team ID shown after submitting, with a confirmation page</li>
+      <li>Team dashboard opened with Team ID + captain mobile</li>
+      <li>Public pages: tournament info, groups, schedule, live leaderboard, bracket</li>
+      <li>Admin dashboard: approvals, Google Form import, groups, schedule, results, qualifying</li>
+      <li>Room creator panel: room details, results, screenshots</li>
+      <li>Staff login (admin and room creator only)</li>
+    </ul></div>
+    <div class="card"><h3>Later <span class="badge b-l">Phase 2+</span></h3><ul>
+      <li>WhatsApp / SMS messages (for example, "Your room ID is ready")</li>
+      <li>OTP to the captain's mobile for dashboard access</li>
+      <li>Entry fees and prizes (only after the legal check in section 14)</li>
+      <li>Automatic screenshot reading</li>
+      <li>Player stats across tournaments</li>
+      <li>Android app</li>
+    </ul></div>
+  </div>
+  <div class="note" style="margin-top:14px">Free Fire has no public game API, so matches are played in custom rooms inside the game. The website handles everything around the match: registration, groups, room details, results and leaderboards.</div>
+</section>
+
+<section id="roles">
+  <div class="kicker">03</div><h2>Who uses it</h2>
+  <div class="tw"><table><thead><tr><th>Person</th><th>How they get in</th><th>Can do</th></tr></thead><tbody>
+    <tr><td><b>Visitor</b></td><td>Just opens the link</td><td>See tournament info, groups, schedule, leaderboard</td></tr>
+    <tr><td><b>Team (captain + 3 players)</b></td><td>No account. Registers through the form; opens the dashboard with Team ID + captain mobile</td><td>Register, see status, group and slot, check in, see room ID and password, see results, raise a complaint</td></tr>
+    <tr><td><b>Room creator</b></td><td>Staff login</td><td>See assigned matches, post room details, enter results and screenshots</td></tr>
+    <tr><td><b>Admin</b></td><td>Staff login</td><td>Everything: approve teams, import the Google Form, make groups, schedule, approve results, qualify, ban</td></tr>
+  </tbody></table></div>
+</section>
+
+<section id="form">
+  <div class="kicker">04</div><h2>Registration form (opens first)</h2>
+  <div class="grid two">
+    <div class="form">
+      <h3>Chennai Squad Cup · Team Registration</h3>
+      <div class="small">Main Tournament · Closes 20 Dec, 11:59 PM</div>
+      <h4>Team name *</h4><div class="f">Team Thunder</div>
+      <h4>Team logo *</h4><div class="f">Upload image (PNG/JPG) · shown on the team dashboard, admin dashboard, groups and leaderboard</div>
+            <h4>Player 1 · Captain *</h4><div class="f">Name</div><div class="f">Mobile (10 digits)</div><div class="f">Email</div><div class="f">Free Fire UID</div>
+      <h4>Player 2 · Player 3 · Player 4 *</h4><div class="f">Same 4 fields for each player</div>
+      <h4>☐ I accept the rules and confirm all players are 18+ or have a parent's permission *</h4>
+      <span class="btn">Submit</span>
+    </div>
+    <div class="card"><h3>Form checks</h3><ul>
+      <li>All fields required for all 4 players</li>
+      <li>Mobile: 10 digits, starting 6–9</li>
+      <li>Email: valid format</li>
+      <li>Free Fire UID: numbers only (8–12 digits), <b>unique across all teams</b></li>
+      <li>The same player (UID or mobile) can't be in two teams</li>
+      <li>Team name must be unique</li>
+      <li>Form closes automatically at the deadline or when <b>all slots are filled</b> (e.g. 252 of 252), and later teams go on a waitlist. The form shows "Slots left: 37 of 252"</li>
+    </ul>
+    <h3 style="margin-top:14px">After submitting</h3><ul>
+      <li>Shows: "Registered! Team ID <b>FF-0427</b>. Save this."</li>
+      <li>Buttons: Copy Team ID · Share on WhatsApp</li>
+      <li>Status starts as <b>Pending</b></li>
+    </ul>
+    <h3 style="margin-top:14px">Existing Google Form data</h3><ul>
+      <li>Admin uploads the Google Sheet as a CSV</li>
+      <li>Columns are matched to the form fields, and the same checks run</li>
+      <li>Every imported team gets a Team ID too</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="kicker">05</div><h2>All screens</h2>
+  <div class="grid three">
+    <div class="card"><h3>Public</h3><ul>
+      <li><code>/</code> Registration form (first page)</li>
+      <li><code>/registered</code> Team ID confirmation</li>
+      <li><code>/info</code> Rules, prize, dates</li>
+      <li><code>/groups</code> Groups by stage</li>
+      <li><code>/schedule</code> All matches</li>
+      <li><code>/leaderboard</code> Live points</li>
+      <li><code>/bracket</code> Stage progression</li>
+    </ul></div>
+    <div class="card"><h3>Team</h3><ul>
+      <li><code>/my-team</code> Enter Team ID + captain mobile</li>
+      <li><code>/my-team/dashboard</code> Team dashboard (section 6)</li>
+      <li><code>/my-team/complaint</code> Raise a result complaint</li>
+    </ul></div>
+    <div class="card"><h3>Staff</h3><ul>
+      <li><code>/staff/login</code></li>
+      <li><code>/admin</code> Overview</li>
+      <li><code>/admin/registrations</code> + Import CSV</li>
+      <li><code>/admin/stages</code> Stage rules</li>
+      <li><code>/admin/groups</code> Group editor</li>
+      <li><code>/admin/schedule</code></li>
+      <li><code>/admin/results</code> Approval queue</li>
+      <li><code>/admin/qualify</code></li>
+      <li><code>/admin/complaints</code>, <code>/admin/log</code></li>
+      <li><code>/room</code> Room creator panel</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="team">
+  <div class="kicker">06</div><h2>Team dashboard</h2>
+  <p class="sub">Mobile-first, because players open it on their phone just before a match.</p>
+  <div class="grid two">
+    <div class="card"><h3>What it shows, top to bottom</h3><ul>
+      <li><b>Next step card</b> (changes automatically): "Waiting for approval" → "Approved: Group C, Slot 7" → "Check in now (closes 6:45 PM)" → "Room ID 1234567 · Pass ff22 · starts 7:00 PM" with copy buttons</li>
+      <li><b>Team</b>: name, Team ID, 4 players with UIDs (mobiles partly hidden: 98xxxxxx21)</li>
+      <li><b>Upcoming matches</b> with countdown</li>
+      <li><b>Results</b>: position, kills, points, rank in group</li>
+      <li><b>Status</b>: Qualified / Eliminated after each stage</li>
+    </ul></div>
+    <div class="card"><h3>Rules</h3><ul>
+      <li>Opens only with the right Team ID + captain mobile; it stays logged in on that phone for 30 days</li>
+      <li>Room details show only after check-in, and only from 15 minutes before the start</li>
+      <li>Times in IST</li>
+      <li>Leaderboard updates live</li>
+      <li>Light pages for slow mobile data</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="admin">
+  <div class="kicker">07</div><h2>Admin dashboard</h2>
+  <div class="grid two">
+    <div class="card"><h3>Overview</h3><ul>
+      <li>Counts: registered, pending, approved, matches today, results waiting, complaints</li>
+      <li>Today's match timeline</li>
+      <li>Alerts: room details missing 10 minutes before the start, results late, a group over capacity</li>
+    </ul></div>
+    <div class="card"><h3>Setup</h3><ul>
+      <li>Tournament name, dates, rules, prize text</li>
+      <li>Admin sets only the <b>number of slots</b> (e.g. 252)</li>
+      <li>Groups of 12, Top 8 / Top 6, the Wild Card stage and number of stages are calculated by the fixed logic (section 9)</li>
+      <li>Live preview of all stages and the bracket updates as the number changes</li>
+      <li>After registration closes, the plan uses the real approved count</li>
+    </ul></div>
+    <div class="card"><h3>Registrations</h3><ul>
+      <li>Table of teams with their 4 players, search and filter</li>
+      <li>Auto flags: duplicate UID or mobile, banned player</li>
+      <li>Approve / reject with a reason (bulk approve too)</li>
+      <li>Import Google Form CSV · Export to Excel</li>
+    </ul></div>
+    <div class="card"><h3>Groups</h3><ul>
+      <li>Generate: in order / random / seeded</li>
+      <li>Move or swap teams; group size can't go over the maximum</li>
+      <li>Draft → Lock → Publish (unlocking needs a reason)</li>
+    </ul></div>
+    <div class="card"><h3>Slots</h3><ul>
+      <li>Admin sets <b>total slots</b> (default 252; can be any number, e.g. 180, 300, 500)</li>
+      <li>Each registered team takes one slot: Slot 1, Slot 2 … Slot 252</li>
+      <li>Form shows slots left, and closes when they're full; later teams go on a waitlist</li>
+      <li>If a team is rejected or withdraws, its slot goes to the first team on the waitlist</li>
+      <li>Admin can raise or lower the limit before groups are generated</li>
+    </ul></div>
+    <div class="card"><h3>Wild Card entry (admin only)</h3><ul>
+      <li>Screen: "Add Wild Card" with team name + 4 players (name, mobile, email, UID), same checks as the form</li>
+      <li><b>6 Wild Cards</b>; they get a Team ID and a "WC" tag</li>
+      <li>When the Wild Card stage is generated (Stage 4 for 252 slots), the admin <b>chooses the group and slot</b> for each Wild Card, or clicks "Auto place" to spread them evenly</li>
+      <li>Groups still never go over 12</li>
+      <li>Every add, move or remove is written in the log</li>
+    </ul></div>
+    <div class="card"><h3>Schedule</h3><ul>
+      <li>Matches created automatically for each group</li>
+      <li>Set date, time and map, and assign a room creator</li>
+    </ul></div>
+    <div class="card"><h3>Results & qualifying</h3><ul>
+      <li>Results next to their screenshots → edit (with a reason) → approve → publish</li>
+      <li>Stage leaderboard with tie-breakers</li>
+      <li>System suggests the Top N, admin confirms → next stage generated from the real count</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="room">
+  <div class="kicker">08</div><h2>Room creator panel</h2>
+  <div class="card"><ul>
+    <li>List of their matches in time order</li>
+    <li>For each match: teams + slots, who has checked in, map, time</li>
+    <li>Enter room ID + password → Publish to teams</li>
+    <li>Mark Live → Mark Completed</li>
+    <li>Results grid: position (1–12, each used once) + kills; total shown live</li>
+    <li>Upload 1–5 screenshots (required) · mark no-show teams</li>
+    <li>Submit → goes to the admin for approval</li>
+  </ul></div>
+</section>
+
+<section id="rules">
+  <div class="kicker">09</div><h2>Rules, points and stages (full plan)</h2>
+  <p class="sub">The logic below is fixed. The only number the admin types is the <b>number of slots</b> (e.g. 252). The admin also adds the 6 Wild Card teams by hand. Everything else is calculated.</p>
+
+  <div class="card"><h3>A. The fixed logic</h3>
+    <div class="tw"><table><thead><tr><th>#</th><th>Rule</th><th>Fixed value</th></tr></thead><tbody>
+      <tr><td>1</td><td>Teams per group (one Free Fire custom room)</td><td><b>12, always</b></td></tr>
+      <tr><td>2</td><td>Number of groups</td><td>Teams ÷ 12, rounded up</td></tr>
+      <tr><td>3</td><td>If teams don't divide by 12 exactly</td><td>Spread evenly: groups differ by at most 1 team (e.g. 11 and 12). Never more than 12.</td></tr>
+      <tr><td>4</td><td>Main Stage 1 qualifiers</td><td><b>Top 8</b> of each group</td></tr>
+      <tr><td>5</td><td>Every later stage</td><td><b>Top 6</b> of each group</td></tr>
+      <tr><td>6</td><td>Wild Card teams</td><td>Default <b>6</b> (admin can set 0–12), added by the admin (no qualifying matches)</td></tr>
+      <tr><td>7</td><td>Where the Wild Cards join</td><td>The first stage where qualified teams + 6 Wild Cards fit in <b>5 groups or fewer (≤ 60 teams)</b></td></tr>
+      <tr><td>8</td><td>Stages keep running until</td><td>12 teams are left</td></tr>
+      <tr><td>9</td><td>Grand Final</td><td><b>Always 12 teams</b>, 1 group, 12 matches over 2 days</td></tr>
+      <tr><td>10</td><td>Matches per group in every stage</td><td>6 matches (Grand Final: 6 + 6)</td></tr>
+    </tbody></table></div>
+    <p class="small" style="margin-top:8px">The system uses the <b>real number of approved teams</b>. If the admin sets 252 slots but only 230 are approved, it plans for 230. Minimum: 24 slots.</p>
+  </div>
+
+  <div class="card" style="margin-top:14px"><h3>B. Same logic, different numbers (calculated)</h3>
+    <div class="tw"><table><thead><tr><th>Slots</th><th>Stages (teams → groups → advance) · bold = Wild Cards join</th><th>Final</th></tr></thead><tbody>
+      <tr><td><b>252</b></td><td>S1 252→21g→168 · S2 168→14g→84 · S3 84→7g→42 · <b>S4 42+6 WC=48</b>→4g→24 · S5 24→2g→12</td><td>12</td></tr>
+      <tr><td><b>180</b></td><td>S1 180→15g→120 · S2 120→10g→60 · S3 60→5g→30 · <b>S4 30+6=36</b>→3g→18 · S5 18→2g→12</td><td>12</td></tr>
+      <tr><td><b>300</b></td><td>S1 300→25g→200 · S2 200→17g→102 · S3 102→9g→54 · <b>S4 54+6=60</b>→5g→30 · S5 30→3g→18 · S6 18→2g→12</td><td>12</td></tr>
+      <tr><td><b>500</b></td><td>S1 500→42g→336 · S2 336→28g→168 · S3 168→14g→84 · S4 84→7g→42 · <b>S5 42+6=48</b>→4g→24 · S6 24→2g→12</td><td>12</td></tr>
+      <tr><td><b>96</b></td><td>S1 96→8g→64 · S2 64→6g→36 · <b>S3 36+6=42</b>→4g→24 · S4 24→2g→12</td><td>12</td></tr>
+    </tbody></table></div>
+    <p class="small" style="margin-top:8px">The number of stages changes by itself: 252 teams need 5 stages before the final, 500 teams need 6. The bold stage is where the 6 Wild Cards join.</p>
+  </div>
+
+  <div class="grid two" style="margin-top:14px">
+    <div class="card"><h3>C. Points for every match</h3>
+      <div class="tw"><table><thead><tr><th>Position</th><th>Points</th><th>Position</th><th>Points</th></tr></thead><tbody>
+      <tr><td>1st (Booyah)</td><td>12</td><td>7th</td><td>4</td></tr><tr><td>2nd</td><td>9</td><td>8th</td><td>3</td></tr><tr><td>3rd</td><td>8</td><td>9th</td><td>2</td></tr><tr><td>4th</td><td>7</td><td>10th</td><td>1</td></tr><tr><td>5th</td><td>6</td><td>11th</td><td>0</td></tr><tr><td>6th</td><td>5</td><td>12th</td><td>0</td></tr>
+      </tbody></table></div>
+      <ul><li><b>Each kill = 1 point</b></li><li>Match points = position points + kill points</li><li>Stage points = total of the 6 matches</li><li>Example: 2nd place + 7 kills = 9 + 7 = <b>16</b></li></ul></div>
+    <div class="card"><h3>D. If two teams have equal points</h3><ol style="padding-left:18px;font-size:14px">
+      <li>More Booyahs (1st places) in the stage</li>
+      <li>More total position points</li>
+      <li>More total kills</li>
+      <li>Better position in the last match</li>
+    </ol>
+    <h3 style="margin-top:12px">E. Grand Final</h3><ul>
+      <li>12 teams, Day 1: 6 matches, Day 2: 6 matches</li>
+      <li>Day 1 points carry over to Day 2</li>
+      <li>Highest total after 12 matches = Champion; then 2nd and 3rd</li>
+    </ul></div>
+  </div>
+
+  <div class="grid two" style="margin-top:14px">
+    <div class="card"><h3>F. Team and registration rules</h3><ul>
+      <li>4 players per team, all with a Free Fire UID</li>
+      <li>A player (UID or mobile) can be in only one team</li>
+      <li>Players must be the same as registered; a different UID in the room = 0 points for that match</li>
+      <li>Team name: no bad words, no copying other teams' names</li>
+      <li>Players 18+ or with a parent's permission</li>
+    </ul></div>
+    <div class="card"><h3>G. Match day rules</h3><ul>
+      <li>Check in on the dashboard before the deadline (30 min before the match)</li>
+      <li>Join the room using your slot number; joining the wrong slot = warning, then 0 points</li>
+      <li>Room ID and password are only for your team; sharing them = disqualified</li>
+      <li>Room closes at start time; late teams get 0 points for that match</li>
+      <li>No restart for disconnects or lag</li>
+      <li>Map order is set by the admin for each stage (e.g. Bermuda, Purgatory, Kalahari)</li>
+    </ul></div>
+    <div class="card"><h3>H. Fair play</h3><ul>
+      <li>No hacks, mods, panels or emulators unless the admin allows them: disqualification + ban</li>
+      <li>No teaming with other teams: disqualification</li>
+      <li>No bug or glitch abuse</li>
+      <li>Room creator and admin can spectate and report</li>
+    </ul></div>
+    <div class="card"><h3>I. Results and complaints</h3><ul>
+      <li>Results come from the room creator's screenshots</li>
+      <li>Complaints within 30 minutes of the result, with a screenshot</li>
+      <li>The admin's decision is final</li>
+      <li>2 no-shows in one stage = removed from the tournament</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="data">
+  <div class="kicker">10</div><h2>Database</h2>
+<div class="code">staff            id, name, email, role[admin|room_creator], password via Supabase Auth
+teams            id, team_code UNIQUE (FF-0427), name UNIQUE, entry[SLOT|WILD_CARD], slot_no,
+                 captain_mobile, status[pending|approved|rejected|waitlist|withdrawn],
+                 reason, source[form|google_import], created_at
+players          id, team_id, slot(1-4), name, mobile, email, ff_uid UNIQUE, is_captain
+tournaments      id, name, rules, prize, starts_at, ends_at, reg_closes_at, total_slots (e.g. 252), wild_cards (6)
+scoring_rules    tournament_id, placement_points jsonb, points_per_kill
+stages           id, tournament_id, pathway, order, name, max_per_group, top_n,
+                 matches_per_group, merges_into_stage_id, status
+stage_teams      stage_id, team_id, source[REGISTERED|QUALIFIED|WILD_CARD]
+groups           id, stage_id, label
+group_teams      group_id, team_id, slot   UNIQUE(group_id, slot)
+matches          id, group_id, number, map, starts_at, room_creator_id,
+                 room_id, room_pass, room_release_at, status
+check_ins        match_id, team_id, at
+match_results    match_id, team_id, placement, kills, points, no_show   UNIQUE(match_id, team_id)
+match_evidence   match_id, image_url, uploaded_by
+qualifications   stage_id, team_id, rank, approved_by
+complaints       id, match_id, team_id, reason, image_url, status, answer
+audit_log        who, action, what, before, after, reason, at</div>
+  <div class="note" style="margin-top:12px">Players' mobiles and emails are visible only to admins. Room passwords are never shown on public pages.</div>
+</section>
+
+<section id="api">
+  <div class="kicker">11</div><h2>Main actions</h2>
+  <div class="tw"><table><thead><tr><th>Area</th><th>Action</th><th>Who</th></tr></thead><tbody>
+    <tr><td>Registration</td><td>submitRegistration (runs all checks, returns Team ID)</td><td>Public</td></tr>
+    <tr><td>Team access</td><td>openTeamDashboard(teamCode, captainMobile)</td><td>Team</td></tr>
+    <tr><td>Match</td><td>checkIn, raiseComplaint</td><td>Team</td></tr>
+    <tr><td>Admin</td><td>approve, reject, importCsv, exportExcel</td><td>Admin</td></tr>
+    <tr><td>Groups</td><td>generateGroups, moveTeam, swapSlots, lock, publish</td><td>Admin</td></tr>
+    <tr><td>Schedule</td><td>createMatches, updateMatch, assignRoomCreator</td><td>Admin</td></tr>
+    <tr><td>Room</td><td>publishRoom, setStatus, submitResults, uploadScreenshot</td><td>Room creator</td></tr>
+    <tr><td>Results</td><td>approveResults, editResult, publish, leaderboard</td><td>Admin / Public</td></tr>
+    <tr><td>Qualify</td><td>suggestTopN, approveQualifiers, generateNextStage, addWildCard, placeWildCard(group, slot)</td><td>Admin</td></tr>
+  </tbody></table></div>
+</section>
+
+<section id="status">
+  <div class="kicker">12</div><h2>Status flows</h2>
+  <div class="grid two">
+    <div class="card"><h3>Team</h3><div class="flow"><span>Pending</span><i>→</i><span>Approved / Rejected / Waitlist</span><i>→</i><span>Qualified or Eliminated (each stage)</span></div></div>
+    <div class="card"><h3>Stage</h3><div class="flow"><span>Draft</span><i>→</i><span>Locked</span><i>→</i><span>Published</span><i>→</i><span>Live</span><i>→</i><span>Done</span></div></div>
+    <div class="card"><h3>Match</h3><div class="flow"><span>Scheduled</span><i>→</i><span>Check-in open</span><i>→</i><span>Room published</span><i>→</i><span>Live</span><i>→</i><span>Completed</span><i>→</i><span>Approved</span><i>→</i><span>Published</span></div></div>
+    <div class="card"><h3>Complaint</h3><div class="flow"><span>Raised (within 30 min)</span><i>→</i><span>Checking</span><i>→</i><span>Kept / Corrected</span></div></div>
+  </div>
+</section>
+
+<section id="security">
+  <div class="kicker">13</div><h2>Security and fair play</h2>
+  <div class="grid two">
+    <div class="card"><h3>Security</h3><ul>
+      <li>Only staff have passwords; teams use Team ID + captain mobile</li>
+      <li>Limit wrong attempts on the team dashboard (5 tries, then wait 15 minutes)</li>
+      <li>Hide mobiles and emails from the public and other teams</li>
+      <li>Screenshots stored privately, images only</li>
+      <li>Every admin change logged</li>
+      <li>Collect no Aadhaar or ID numbers</li>
+    </ul></div>
+    <div class="card"><h3>Fair play</h3><ul>
+      <li>One UID in one team only</li>
+      <li>Ban list by UID and mobile</li>
+      <li>Room details released late and only to checked-in teams</li>
+      <li>Room creator reports unknown players in the room</li>
+      <li>Every result needs screenshots</li>
+    </ul></div>
+  </div>
+  <div class="note" style="margin-top:12px">Weak point: anyone who knows the Team ID and captain mobile can open the dashboard. That's fine for a prototype; add an OTP later.</div>
+</section>
+
+<section id="legal">
+  <div class="kicker">14</div><h2>Legal and brand checks</h2>
+  <div class="warn"><b>Check before launch (not legal advice):</b><ul>
+    <li><b>Entry fees and cash prizes:</b> India's online gaming law of 2025 bans online money games; e-sports are treated separately. Keep the prototype <b>free to enter</b> and ask a lawyer before taking fees.</li>
+    <li><b>Game:</b> confirm the Free Fire version your players use (e.g. Free Fire MAX) is officially available in India.</li>
+    <li><b>Brand:</b> Free Fire belongs to Garena. Use your own logo and say "Community tournament, not affiliated with Garena".</li>
+    <li><b>Minors:</b> add an 18+ or parent's-permission checkbox to the form.</li>
+    <li><b>Privacy:</b> you collect mobiles and emails, so add a short privacy note (Digital Personal Data Protection Act, 2023).</li>
+  </ul></div>
+</section>
+
+<section id="tech">
+  <div class="kicker">15</div><h2>Technology</h2>
+  <div class="grid two">
+    <div class="card"><ul>
+      <li>Next.js + TypeScript + Tailwind CSS</li>
+      <li>Supabase: database, staff login, screenshot storage, live updates</li>
+      <li>Vercel hosting</li>
+      <li>Prototype first runs with sample data (252 slots + 6 Wild Cards) so every screen can be tried</li>
+    </ul></div>
+    <div class="card"><div class="code">free-fire-template/
+  app/  (public) form, groups, leaderboard
+        my-team/   admin/   room/
+  lib/  fixture/  scoring/  db/
+  components/
+  supabase/ schema + sample data
+  tests/</div></div>
+  </div>
+</section>
+
+<section id="plan">
+  <div class="kicker">16</div><h2>Build plan</h2>
+  <div class="tw"><table><thead><tr><th>Step</th><th>What</th><th>Done when</th></tr></thead><tbody>
+    <tr><td>1</td><td>Project setup, database, sample data</td><td>300 sample teams load</td></tr>
+    <tr><td>2</td><td>Group + points engine (from the existing calculator) with tests</td><td>252 slots give 21/14/7 groups and 48 at Stage 4</td></tr>
+    <tr><td>3</td><td>Registration form + checks + Team ID</td><td>A team registers and gets FF-xxxx</td></tr>
+    <tr><td>4</td><td>Admin: approvals, CSV import, groups, schedule</td><td>Stage 1 groups published</td></tr>
+    <tr><td>5</td><td>Team dashboard + check-in + room release</td><td>Only checked-in teams see the room ID</td></tr>
+    <tr><td>6</td><td>Room creator panel + results approval + live leaderboard</td><td>Points update live</td></tr>
+    <tr><td>7</td><td>Qualifying, next stage, Wild Cards, Grand Final</td><td>Full run to Champion with sample data</td></tr>
+    <tr><td>8</td><td>Complaints, polish, real test with 2–3 teams</td><td>Ready to show</td></tr>
+  </tbody></table></div>
+</section>
+
+<section id="decide">
+  <div class="kicker">17</div><h2>Decisions (confirmed 3 Nov 2026)</h2>
+  <div class="card"><ul>
+    <li><b>Prototype:</b> demo with sample data (252 teams), runs on this computer, data kept in the browser; can be connected to a real database later</li>
+    <li><b>Wild Cards:</b> admin can change the number (default 6, range 0–12); the joining stage adjusts automatically</li>
+    <li><b>Tournaments:</b> one at a time; old ones archived</li>
+    <li><b>Branding:</b> placeholder name "Squad Cup", dark + orange colours, changeable later</li>
+    <li><b>Assumed:</b> 4 players, no substitute · dashboard opens with Team ID + captain mobile · free entry · English</li>
+  </ul></div>
+</section>
+
+<footer>Tournament Platform · Prototype blueprint v5 · Based on "Free Fire Tournament Management — System Architecture"</footer>
+</div>
+</body>
+</html>
