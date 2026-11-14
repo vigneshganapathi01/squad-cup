@@ -1540,3 +1540,53 @@ span.av.av-letter b::after{content:"";position:absolute;left:-2%;top:0;bottom:0;
 @font-face{font-family:"GFF Latin";src:url(fonts/GFF-Latin-Medium.woff2) format("woff2");font-weight:500 900;font-style:normal;font-display:swap}
 :root{--display:"GFF Latin",Gear,Inter,sans-serif;--wide:"GFF Latin",Gear,Inter,sans-serif;--num:"GFF Latin",Gear,Inter,sans-serif}
 html,body{font-family:"GFF Latin",Gear,Inter,ui-sans-serif,system-ui,sans-serif}
+/* ===== Brand logo: DJ Esports replaces the SC mark (top-left) ===== */
+.logo .sc-mark{display:none}
+.logo{width:58px!important;height:40px!important;background:url(art/dj-esports.webp) 50% 50%/contain no-repeat!important;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45))}
+.brand:hover .logo{filter:drop-shadow(0 0 8px rgba(80,255,80,.35))}
+/* ===== LIVE match card: running glow around the border + subtle sparks inside ===== */
+@property --live-ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+.mcard.is-live{border:1px solid transparent!important;
+  background:linear-gradient(#1b1f31,#1b1f31) padding-box,
+    conic-gradient(from var(--live-ang),rgba(255,70,85,.18) 0deg,rgba(255,70,85,.18) 230deg,#ff4655 300deg,#ffb36b 332deg,rgba(255,70,85,.18) 360deg) border-box!important;
+  animation:live-spin 3.4s linear infinite,live-halo 2.6s ease-in-out infinite}
+@keyframes live-spin{to{--live-ang:360deg}}
+@keyframes live-halo{0%,100%{filter:drop-shadow(0 0 6px rgba(255,70,85,.18))}50%{filter:drop-shadow(0 0 14px rgba(255,70,85,.38))}}
+/* content above the effects */
+.mcard.is-live>*{position:relative;z-index:1}
+/* sparks: tiny warm embers rising from the bottom of the card, faded toward the top */
+.mcard.is-live::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.6;background-repeat:repeat;background-size:220px 140px;
+  background-image:
+    radial-gradient(1.4px 4.5px at 22px 120px,#ffcf7a 35%,transparent 100%),
+    radial-gradient(1px 3.4px at 64px 60px,#ff9a5a 35%,transparent 100%),
+    radial-gradient(2px 6px at 108px 100px,rgba(255,190,110,1),rgba(255,90,60,.45) 45%,transparent 100%),
+    radial-gradient(1px 3.2px at 150px 30px,#ffd88a 35%,transparent 100%),
+    radial-gradient(1.3px 4px at 196px 128px,#ff8a5a 35%,transparent 100%),
+    radial-gradient(.9px 3px at 84px 12px,#ffc04a 35%,transparent 100%);
+  -webkit-mask-image:linear-gradient(0deg,#000 0,rgba(0,0,0,.55) 55%,transparent 100%);mask-image:linear-gradient(0deg,#000 0,rgba(0,0,0,.55) 55%,transparent 100%);
+  animation:live-sparks 5.5s linear infinite}
+@keyframes live-sparks{from{background-position:0 140px}to{background-position:-30px 0}}
+@media(prefers-reduced-motion:reduce){.mcard.is-live,.mcard.is-live::after{animation:none}}
+/* ===== Live card tweaks: no red dot in the heading, no outer red halo, a bit larger card ===== */
+h2 .dot-live{display:none}
+.mcard.is-live{animation:live-spin 3.4s linear infinite!important;filter:none!important}
+.grid:has(> .mcard.is-live){grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),420px))!important}
+.mcard.is-live{padding:18px 20px!important;min-height:150px}
+.mcard.is-live .mtitle{font-size:18px!important;margin:6px 0 2px}
+.mcard.is-live .avs{margin-top:12px}
+.mcard.is-live .av{width:26px!important;height:26px!important}
+/* ===== Live card: smaller team logos; white running border + white sparks ===== */
+.mcard.is-live .av{width:20px!important;height:20px!important}
+.mcard.is-live .avs{gap:5px}
+.mcard.is-live{background:linear-gradient(#1b1f31,#1b1f31) padding-box,
+    conic-gradient(from var(--live-ang),rgba(255,255,255,.10) 0deg,rgba(255,255,255,.10) 230deg,rgba(255,255,255,.55) 290deg,#fff 330deg,rgba(255,255,255,.10) 360deg) border-box!important}
+.mcard.is-live::after{opacity:.5;background-image:
+    radial-gradient(1.4px 4.5px at 22px 120px,#fff 35%,transparent 100%),
+    radial-gradient(1px 3.4px at 64px 60px,rgba(255,255,255,.85) 35%,transparent 100%),
+    radial-gradient(2px 6px at 108px 100px,#fff,rgba(220,225,255,.45) 45%,transparent 100%),
+    radial-gradient(1px 3.2px at 150px 30px,rgba(255,255,255,.9) 35%,transparent 100%),
+    radial-gradient(1.3px 4px at 196px 128px,#fff 35%,transparent 100%),
+    radial-gradient(.9px 3px at 84px 12px,rgba(255,255,255,.8) 35%,transparent 100%)}
+
+/* ===== Hero meta: hide "252/252 Teams (4v4 squad)" and "Groups (Top 8 → Top 6) then Grand Final" ===== */
+.th-meta>span:nth-child(2),.th-meta>span:nth-child(3){display:none}
