@@ -1,0 +1,19 @@
+# OCR service + Caddy (automatic HTTPS). Set the values in .env next to this file (see README.md).
+services:
+  ocr:
+    build: .
+    restart: unless-stopped
+    environment:
+      OCR_ALLOW_ORIGINS: ${OCR_ALLOW_ORIGINS}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    expose: ["8765"]
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    command: caddy reverse-proxy --from ${OCR_DOMAIN} --to ocr:8765
+    volumes: ["caddy_data:/data"]
+    depends_on: [ocr]
+volumes:
+  caddy_data:

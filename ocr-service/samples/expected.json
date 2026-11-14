@@ -1,0 +1,40 @@
+{
+  "_note": "Read by eye from the sample screenshots. Kills are exact; names are as close as plain text allows (styled symbols simplified). Ranks not visible in a screenshot are left out.",
+  "match-a.webp": {
+    "1": [["7S M4RCO", 1], ["7S RED777", 5], ["7S JINWOO", 3], ["NLC RONALDO", 4]],
+    "2": [["UD JACK", 2], ["UD STUART", 2], ["UD YASH", 1], ["UD DANNY", 1]],
+    "3": [["VJ LORD", 6], ["VJ SPIDY", 4], ["NOBITA", 6], ["VJ SPEED", 7]],
+    "4": [["KN.Dev!l", 0], ["MER|c@L.", 1], ["KN.Aaku", 0], ["MTR X TOBI", 0]],
+    "5": [["Mz.VOID", 2], ["Mz.ZENO", 4], ["VG X NAVEEN", 6], ["Mz.MUFIX", 4]],
+    "6": [["ALPHAXGOKU", 2], ["HARSHU", 3], ["AG PRIME", 3], ["ALPHAXJACK", 1]],
+    "7": [["TAZ IGRIS", 0], ["JOHNY", 1], ["SAM", 0], ["KUTTY", 2]],
+    "8": [["PRAGITH", 0], ["plus", 1], ["RITHU", 1], ["7S NEON", 0]],
+    "9": [["RAG X AKEEL", 0], ["RAG X SPARK", 0], ["ZOR OisLIVE", 1], ["Kaarvin Hero", 0]],
+    "10": [["LUFFY", 1], ["MADARA", 1]]
+  },
+  "match-b.webp": {
+    "1": [["Jd.kuttyy!", 3], ["Jd.hitlerr!", 8], ["Jd.yashh!", 11], ["INF SINGLE!!", 3]],
+    "2": [["G_MASS", 4], ["KG_FREDY", 2], ["KG_SHADOW", 4], ["Mz.Jackrose8", 6]],
+    "3": [["KP BEAST", 3], ["KP SPARK", 5], ["சந்திரசேகர்.", 2], ["MADARA", 3]],
+    "4": [["TA ZENITSU", 1], ["TA JACK", 3], ["TA GOD", 4], ["TA BRITANNIA", 2]],
+    "5": [["BABAYAGAAA", 3], ["JERRY", 1], ["AJAY", 7], ["Kutty", 2]],
+    "8": [["UFC.WOLF", 2], ["UFC.smurt", 4], ["UFC.BEAST", 1], ["UFC.Praveen", 0]],
+    "9": [["DJaadhavan54", 0], ["GOD OF EK", 1], ["OBITO", 0], ["###", 0]],
+    "10": [["WeSp Samir", 0], ["WeSp Lunaris", 2], ["WeSp Ram", 4], ["WeSp Rabin", 1]],
+    "11": [["RES.TOXIC", 1], ["RES.SABUJ07", 1], ["ANSAR", 1], ["RES.MADARA07", 7]],
+    "12": [["TL.HYBRID07", 2], ["7SGOD", 0], ["7SVENOM", 0], ["SREE.HXZ", 0]]
+  },
+  "match-c.webp": {
+    "_note": "Owner's sample, 14 Nov 2026. Shows ranks 1-10 (11-12 need the scrolled screenshot). Rank 9's names are faded and partly hidden in the image, so its names are best guesses; its kills are clear. Order per team: top-left, top-right, bottom-left, bottom-right.",
+    "1": [["UD KUTTY", 4], ["UD JACK", 8], ["UD RITHICK", 8], ["UD HITLER", 5]],
+    "2": [["TONY", 4], ["TN_LEGEND", 4], ["TOJI", 2], ["The_WITCHER", 6]],
+    "3": [["RK CHUTTI !!", 2], ["Rbz k4i5er11", 2], ["RK VIJAY !", 1], ["NKG.alpha07", 1]],
+    "4": [["M11PLAYS15!", 1], ["Rk.Shinra18!", 2], ["Rk.Mt7!", 0], ["RK.gz.marco", 0]],
+    "5": [["SP!DY-SRZ!", 1], ["A!ZEN-18", 0], ["PAIN LEO", 2], ["ROCKLEE~SRZ!", 1]],
+    "6": [["DZ.CARNAGE!!", 1], ["ML AXE 777", 4], ["INF.Tenzo07!", 1], ["KETTAVAN", 2]],
+    "7": [["NBS BRUTAL", 0], ["MLC.OXFORD", 2], ["NBS INFERNO", 2], ["NBS REDEYE", 4]],
+    "8": [["F1 COOLIE", 0], ["F1 VIRUS", 0], ["F1 BONXZ444", 0], ["F1 GROOT", 1]],
+    "9": [["BZ சரண்", 0], ["BZ தமி", 0], ["BZ SUBASH", 0], ["BZ SPE", 1]],
+    "10": [["HL K1zhi", 0], ["A.I Prakash", 1], ["HL.God!03", 1], ["HL.Aiger!K22", 0]]
+  }
+}

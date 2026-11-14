@@ -1,0 +1,39 @@
+{
+  "_note": "Test fixture: each sample's teams as they would be registered (exact In Game Names with their special characters), in the same player order as expected.json. match-b uses the real names from the demo sample group. match-c uses styled versions read by eye from the screenshot (the real registrations are not known). match-a uses plain names.",
+  "match-a.webp": {
+    "1": ["7S M4RCO", "7S RED777 ✓", "7S JINWOO !!", "NLC RONALDO⁷"],
+    "2": ["ᑌD ᴊᴀᴄᴋ ☣", "ᑌD ꜱᴛᴜᴀʀᴛ ☣", "ᑌD ʏᴀꜱʜ ☣", "ᑌD ᴅᴀɴɴʏ ☣"],
+    "3": ["√J Lᴏʀᴅ !!", "√J Sᴘɪᴅʏ 모", "⚠ NOBITA !!", "√J Sᴘᴇᴇᴅ 모"],
+    "4": ["KN.Dev!l⁰⁷", "MER|c@L.ϯ", "KN.Aaku¹¹", "MTR X TOBI"],
+    "5": ["Mz.VOID", "Mz.ZENO", "VG X NAVEEN", "Mz.MUFIX !"],
+    "6": ["†ALPHAXGOKU", "ᴛʜᴇ HARSHU", "AG PRIME", "ALPHAXJACK"],
+    "7": ["TAZ IGRIS !!", "Tᴋ◆JOHNY≈", "AE SAM✦", "KUTTY⁷⁷"],
+    "8": ["OP★PRAGITH", "plus", "TN?RITHU", "7S NEON !"],
+    "9": ["RAG X AKEEL", "RAG X SPARK", "ZOR OisLIVE", "Kaarvin Hero"],
+    "10": ["LUFFY ¿?", "MADARA"]
+  },
+  "match-b.webp": {
+    "1": ["Jd.kuttyy!", "Jd.hitlerr!", "Jd.yashh!", "INF SINGLE!!"],
+    "2": ["G_MASSᴼᴾ", "KG_FREDY", "KG_SHADOW", "Mz.Jackrose8"],
+    "3": ["KP BEAST", "KP SPARK", "சந்திரசேகர்.", "TN◉MADARA©"],
+    "4": ["TA ZENITSU", "TA JACK", "TA GOD", "TA BRITANNIA"],
+    "5": ["BABAYAGAAA", "JERRY", "AJAY", "Kutty"],
+    "8": ["UFC.WOLF", "UFC.smurt", "UFC.BEAST", "UFC.Praveen"],
+    "9": ["DJaadhavan54", "ɢᴏᴅ ᴏꜰ ᴇᴋ", "ⓄBITO♡", "சனி###"],
+    "10": ["WeSp Samir", "WeSp Lunaris", "WeSp Ram", "WeSp Rabin"],
+    "11": ["RES.TOXIC¹²", "RES.SABUJ07", "ANSAR -!!", "RES.MADARA07"],
+    "12": ["TL.HYBRID07", "7SGOD♨", "7SVENOM♨", "SREE.HXZ"]
+  },
+  "match-c.webp": {
+    "1": ["ᑌD ᴋᴜᴛᴛʏ ☣", "ᑌD ᴊᴀᴄᴋ ☣", "ᑌD ʀɪᴛʜɪᴄᴋ ♂", "ᑌD ʜɪᴛʟᴇʀ ☣"],
+    "2": ["TONY", "TN_LEGEND✓⁘", "TOJI", "The_ᴡɪᴛᴄʜᴇʀ♡"],
+    "3": ["RK ᴄʜᴜᴛᴛɪ !!", "Rʙᴢ k4i5er11", "RK ᴠɪᴊᴀʏ !", "NKG.alpha07"],
+    "4": ["M11PLAYS15!", "Rk.Shinra18!", "Rk.Mt7!", "RK.gz.marco"],
+    "5": ["SP!DY-SRZ!", "A!ZEN-18", "Pᴀɪɴ Lᴇᴏ", "ROCKLEE~SRZ!"],
+    "6": ["DZ.CARNAGE!!", "ML AXE 777", "INF.Tenzo07!", "KETTAVAN"],
+    "7": ["NBS ʙʀᴜᴛᴀʟ", "MLC.OXFORD", "NBS ɪɴꜰᴇʀɴᴏ", "NBS ʀᴇᴅᴇʏᴇ"],
+    "8": ["F1 ᴄᴏᴏʟɪᴇ", "F1 ᴠɪʀᴜꜱ", "F1 BONXZ444", "F1 ɢʀᴏᴏᴛ"],
+    "9": ["BZ சரண்", "BZ தமிழ்", "BZ ~SUBASH", "BZ Sᴘᴇᴇᴅ"],
+    "10": ["HL K1zhi", "A.I Prakaஷ்", "HL.God!03", "HL.Aiger!K22"]
+  }
+}

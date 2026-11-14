@@ -5,7 +5,7 @@ const MAPS = ['Bermuda', 'Purgatory', 'Kalahari', 'Alpine', 'NeXTerra', 'Bermuda
 
 // ---------- storage ----------
 function fresh() {
-  return { settings: { name: 'Squad Cup', slots: 252, wildCards: 6, regOpen: true, regCloses: '2026-12-20', prize: '₹50,000', organiser: 'Squad Cup Esports', startDate: '2026-12-27' },
+  return { settings: { name: 'Squad Cup', slots: 252, wildCards: 12, regOpen: true, regCloses: '2026-12-20', prize: '₹50,000', organiser: 'Squad Cup Esports', startDate: '2026-12-27' },
     teams: [], seq: 0, stages: [], log: [], complaints: [], groupLinks: {}, notifications: [], wcInvites: [] };
 }
 let S = (window.Cloud && Cloud.on) ? fresh() : (load(KEY) || fresh());
@@ -86,46 +86,114 @@ const wcJoined = () => S.stages.some(s => s.wcJoin > 0);
 function approvedSlotCount() { return slotTeams().filter(t => t.status === 'approved').length; }
 // Visitors can't see Wild Card teams before they play, so public pages plan with the configured number.
 const wcPlanned = () => (Cloud.on && !Cloud.role) ? S.settings.wildCards : wcTeams().length;
-// Format options the admin can change in Settings (defaults: Top 8 in Stage 1, Top 6 after, 6 matches a group, 12 in the final).
-// Ready-made bracket formats (Settings and Stages). Picking one fills the format fields.
+// Wild Cards are optional: the admin turns them on (how many: a multiple of 12) or off (0) in Settings → Format.
+const wcOn = () => (Number(S.settings.wildCards) || 0) > 0;
+// ---------- the bracket: set by the admin as team counts ----------
+// Every group has exactly 12 teams. The admin sets Total slots (Stage 1) and how many teams enter each later stage
+// (S.settings.path, multiples of 12, the last = Grand Final 12) plus the stage the Wild Cards join (S.settings.wcStage).
+// Groups = teams ÷ 12. Qualifiers = Top N of every group + the best next-placed teams to reach the count (E.planPath).
+// Ready-made formats fill the team counts (keep about stage1Top/12 of the teams after Stage 1, laterTop/12 after that).
 const FORMATS = {
-  standard: { label: 'Standard: Top 8 → Top 6, MT 6, Final MT 12', stage1Top: 8, laterTop: 6, matchesPerStage: 6, finalMatches: 12, finalMode: 'normal' },
-  quick: { label: 'Quick: Top 6 → Top 4, MT 4, Final MT 8', stage1Top: 6, laterTop: 4, matchesPerStage: 4, finalMatches: 8, finalMode: 'normal' },
-  long: { label: 'Long: Top 9 → Top 8, MT 8, Final MT 12', stage1Top: 9, laterTop: 8, matchesPerStage: 8, finalMatches: 12, finalMode: 'normal' },
-  rush: { label: 'Champion Rush final: Top 8 → Top 6, MT 6, Final MT 12', stage1Top: 8, laterTop: 6, matchesPerStage: 6, finalMatches: 12, finalMode: 'rush' },
+  standard: { label: 'Standard (about Top 8, then Top 6) · MT 6 · Final MT 12', stage1Top: 8, laterTop: 6, matchesPerStage: 6, finalMatches: 12, finalMode: 'normal' },
+  quick: { label: 'Quick (about Top 6, then Top 4) · MT 4 · Final MT 8', stage1Top: 6, laterTop: 4, matchesPerStage: 4, finalMatches: 8, finalMode: 'normal' },
+  long: { label: 'Long (about Top 9, then Top 8) · MT 8 · Final MT 12', stage1Top: 9, laterTop: 8, matchesPerStage: 8, finalMatches: 12, finalMode: 'normal' },
+  rush: { label: 'Champion Rush final (about Top 8, then Top 6) · MT 6 · Final MT 12', stage1Top: 8, laterTop: 6, matchesPerStage: 6, finalMatches: 12, finalMode: 'rush' },
 };
 const FORMAT_KEYS = ['stage1Top', 'laterTop', 'matchesPerStage', 'finalMatches', 'finalMode'];
-function formatOf(s) {
-  const cur = { stage1Top: Number(s.stage1Top) || 8, laterTop: Number(s.laterTop) || 6, matchesPerStage: Number(s.matchesPerStage) || 6, finalMatches: Number(s.finalMatches) || 12, finalMode: s.finalMode === 'rush' ? 'rush' : 'normal' };
-  return Object.keys(FORMATS).find(k => FORMAT_KEYS.every(f => FORMATS[k][f] === cur[f])) || 'custom';
+// The saved team counts, or (older data, nothing saved yet) the ones the chosen format suggests.
+function bracket(s = S.settings) {
+  if (Array.isArray(s.path) && s.path.length) return { path: s.path.map(Number), wcStage: Number(s.wcStage) || 0 };
+  return E.suggestPath(s.slots, Number(s.wildCards) || 0, Number(s.stage1Top) || E.STAGE1_TOP, Number(s.laterTop) || E.LATER_TOP);
 }
-const formatSelect = (s, name) => `<select name="${name}" data-act="preset">${Object.entries(FORMATS).map(([k, f]) => `<option value="${k}" ${formatOf(s) === k ? 'selected' : ''}>${f.label}</option>`).join('')}<option value="custom" ${formatOf(s) === 'custom' ? 'selected' : ''}>Custom (your own numbers)</option></select>`;
-const planOpts = () => ({ top1: S.settings.stage1Top, topN: S.settings.laterTop, matches: S.settings.matchesPerStage, finalMatches: S.settings.finalMatches });
-// Stages already generated keep their real numbers; only the stages still to come follow the current format.
-function plan() {
-  if (!S.stages.length) return E.planStages(approvedSlotCount(), wcPlanned(), planOpts());
-  const wcLeft = wcJoined() ? 0 : wcPlanned();
-  const out = S.stages.map((b, i) => {
-    const sizes = b.groups.map(g => g.teamIds.length);
-    let advancing = null, fill = 0;
-    if (!b.final) {
-      if (b.status === 'done') advancing = (b.qualified || []).length;
-      else {
-        advancing = sizes.reduce((a, n) => a + Math.min(n, b.topN), 0);
-        const wcNext = wcLeft && advancing + wcLeft <= E.MERGE_MAX ? wcLeft : 0;
-        if (advancing + wcNext < E.FINAL_TEAMS) { fill = Math.max(0, Math.min(b.entering, E.FINAL_TEAMS - wcNext) - advancing); advancing += fill; }
-      }
-    }
-    return { index: i, name: b.name, final: b.final, entering: b.entering, wcJoin: b.wcJoin || 0, sizes, topN: b.topN, advancing, fill, matches: b.matchCount || (b.final ? E.FINAL_MATCHES : E.MATCHES) };
-  });
-  const last = out[out.length - 1];
-  if (last.final) return out;
-  const o = planOpts();
-  E.planStages(last.advancing, wcLeft, { ...o, top1: o.topN }).forEach(r => { r.index = out.length; if (!r.final) r.name = 'Stage ' + (out.length + 1); out.push(r); });
+const presetPath = (f, s = S.settings) => E.suggestPath(s.slots, Number(s.wildCards) || 0, f.stage1Top, f.laterTop);
+function formatOf(s) {
+  const b = bracket(s), same = (x, y) => x.path.join() === y.path.join() && x.wcStage === y.wcStage;
+  return Object.keys(FORMATS).find(k => { const f = FORMATS[k];
+    const m = stageMatches(s);
+    return same(b, presetPath(f, s)) && m.slice(0, -1).every(v => v === f.matchesPerStage) && m[m.length - 1] === f.finalMatches && f.finalMode === (s.finalMode === 'rush' ? 'rush' : 'normal'); }) || 'custom';
+}
+const formatSelect = (s, name) => `<select name="${name}" data-act="preset">${Object.entries(FORMATS).map(([k, f]) => `<option value="${k}" ${formatOf(s) === k ? 'selected' : ''}>${f.label}</option>`).join('')}<option value="custom" ${formatOf(s) === 'custom' ? 'selected' : ''}>Custom (your own team counts)</option></select>`;
+// Matches per group, set by the admin for each stage (S.settings.stageMatches: Stage 1 … Grand Final).
+// Older data has one number for every stage (matchesPerStage) and one for the final (finalMatches).
+function stageMatches(s = S.settings, n = bracket(s).path.length + 1) {
+  const list = Array.isArray(s.stageMatches) ? s.stageMatches.map(Number) : [], ok = v => v >= 1 && v <= 30 ? Math.floor(v) : 0;
+  const def = Number(s.matchesPerStage) || E.MATCHES, defFin = Number(s.finalMatches) || E.FINAL_MATCHES;
+  const fin = ok(list.length ? list[list.length - 1] : 0) || defFin;   // the last saved number is always the final's
+  return Array.from({ length: n }, (_, i) => i === n - 1 ? fin : (i < list.length - 1 && ok(list[i])) || def);
+}
+// Keep each stage's matches when stages are added, removed or re-spread: the final keeps its number, new stages copy the one before.
+function remapMts(mts, newLen) {
+  const fin = mts[mts.length - 1], out = [];
+  for (let i = 0; i < newLen - 1; i++) out.push(i < mts.length - 1 ? mts[i] : (out[i - 1] ?? mts[0] ?? E.MATCHES));
+  out.push(fin);
   return out;
+}
+// Stage names chosen by the admin (S.settings.stageNames, Stage 1 … Grand Final). '' = the default name.
+// Names are cleaned to letters, numbers and simple punctuation, so they are safe wherever they are shown.
+function stageNames(s = S.settings, n = bracket(s).path.length + 1) {
+  const list = Array.isArray(s.stageNames) ? s.stageNames.map(E.cleanStageName) : [], fin = list.length ? list[list.length - 1] : '';
+  return Array.from({ length: n }, (_, i) => i === n - 1 ? fin : i < list.length - 1 ? list[i] : '');
+}
+function remapNames(names, newLen) {
+  const fin = names[names.length - 1] || '', out = [];
+  for (let i = 0; i < newLen - 1; i++) out.push(i < names.length - 1 ? names[i] : '');
+  out.push(fin);
+  return out;
+}
+const planOpts = () => ({ matches: S.settings.matchesPerStage, finalMatches: S.settings.finalMatches, matchesList: stageMatches(), names: stageNames() });
+const pathText = () => [S.settings.slots, ...bracket().path].join(' → ');
+// The whole tournament: stages already generated keep their real teams; the rest follow the admin's team counts.
+// Groups never come from how many teams have registered.
+function plan() {
+  const s = S.settings, b = bracket(), base = E.planPath(s.slots, Number(s.wildCards) || 0, b.path, b.wcStage, planOpts());
+  return base.map((ps, i) => {
+    const st = S.stages[i]; if (!st) return ps;
+    const out = { ...ps, name: st.name, final: st.final, entering: st.entering, wcJoin: st.wcJoin || 0, sizes: st.groups.map(g => g.teamIds.length), matches: st.matchCount || ps.matches };
+    if (!st.final) {
+      if (st.status === 'done') out.advancing = (st.qualified || []).length;
+      else { const r = E.qualifyRule(ps.advancing, st.groups.length); out.topN = r.topN; out.extra = out.fill = r.extra; }
+    }
+    return out;
+  });
+}
+// Keep each running stage's qualify numbers in line with the team counts (shown on leaderboards and used by qualifiersOf).
+function syncTargets() {
+  const p = plan();
+  S.stages.forEach(st => { const ps = p[st.index]; if (st.final || st.status === 'done' || !ps || ps.final) return;
+    st.toNext = ps.advancing; st.topN = ps.topN; st.extra = ps.extra; });
+}
+// "Top 6" or "Top 5 + 15 best 6th places"
+const qualText = (topN, extra) => `Top ${topN}${extra ? ` + ${extra} best ${ordinal(topN + 1)} place${extra > 1 ? 's' : ''}` : ''}`;
+function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+// Problems with the bracket, trying settings without saving them (over: slots, wildCards, path, wcStage). Empty = fine.
+// Stages already generated are not checked again.
+function formatProblems(over = {}) {
+  const s = { ...S.settings, ...over }, b = bracket(s);
+  const errs = E.checkPath(s.slots, Number(s.wildCards) || 0, b.path, b.wcStage, S.stages.length, stageNames(s));
+  return wcJoined() ? errs.filter(e => !e.startsWith('Wild Card teams must be')) : errs;
+}
+// Stage 1 needs every slot filled with an approved team, so each of the slots ÷ 12 groups is exactly 12. Returns why not, or ''.
+function stage1Blocked() {
+  const n = approvedSlotCount(), slots = S.settings.slots;
+  if (!E.slotsOk(slots)) return `Total slots (${slots}) must be a multiple of 12. Change it in Settings.`;
+  if (n < slots) { const down = Math.floor(n / E.GROUP_SIZE) * E.GROUP_SIZE;
+    return `All ${slots} slots must be filled with approved teams first (${n} now, ${slots - n} to go).${down >= 24 ? ` Or lower Total slots in Settings to ${down}.` : ''}`; }
+  const probs = formatProblems(); if (probs.length) return `The stage team counts need fixing in Settings: ${probs[0]}.`;
+  return '';
 }
 // Groups are shown as numbers (Group 1, 2, 3 …). Older data stores letters (A, B, C …).
 const GL = l => /^[A-Z]\d*$/.test(String(l)) ? String(l.charCodeAt(0) - 64 + 26 * (Number(String(l).slice(1)) || 0)) : String(l);
+// A group's name: "Group 3"; "Grand Final" when the final is one group; "Final · Group 2" when the admin chose a bigger final.
+// short: "Final" / "Final G2" for tight spots.
+function gName(st, g, short) {
+  if (!st.final) return 'Group ' + GL(g.label);
+  if (st.groups.length <= 1) return short ? 'Final' : st.name;
+  return (short ? 'Final G' : st.name + ' · Group ') + (st.groups.indexOf(g) + 1);
+}
+// Grand Final ranking: one group → its table; several groups → every finalist ranked together on total points.
+function finalRows(st) {
+  return st.groups.length === 1 ? rowsOf(st.groups[0]) : E.standings(st.groups.flatMap(g => g.teamIds), st.groups.flatMap(groupResults));
+}
 // Real match dates: a stage starts the day after the previous one ends, unless the admin set its own start date.
 function stageStart(st) {
   if (st.startDate) return st.startDate;
@@ -151,7 +219,8 @@ const mapOf = m => mapShown(m) ? m.map : 'Map TBA';
 // Standings of one group. In the Grand Final with Champion Rush on, the rush winner is ranked first.
 const RULES_MATCH = ['Check in on My Team before every match', 'Room ID and password appear 15 minutes before the start', 'Join with your slot number. Late teams get 0 points', 'No restart for disconnects', 'Never share room details'];
 const RULES_FAIR = ['Only your 4 registered players may play', 'No hacks, panels, emulators or teaming', 'Complaints within 30 minutes, with a screenshot', "The organiser's decision is final"];
-const rushOn = () => S.settings.finalMode === 'rush';
+// Champion Rush needs one room, so only a 12-team (one-group) Grand Final can use it.
+const rushOn = () => S.settings.finalMode === 'rush' && (bracket().path.slice(-1)[0] || E.FINAL_TEAMS) <= E.GROUP_SIZE;
 const rushTarget = () => Math.max(1, Number(S.settings.rushTarget) || 80);
 // Champion Rush: a team that has reached the points target is on "match point"; the first such team to win a Booyah is champion.
 function rushState(g) {
@@ -177,35 +246,32 @@ function rowsOf(g) {
 const logoOk = () => /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(S.settings.logo || '');
 const tlogo = cls => logoOk() ? `<img class="${cls} tl-img" src="${S.settings.logo}" alt="${esc(S.settings.name)} logo">` : `<span class="${cls}">SC</span>`;
 function qualifiersOf(stage) {
-  // Top N of each group, seeded overall: all 1st places by points, then all 2nd places, ...
-  const per = stage.groups.map(g => rowsOf(g).slice(0, stage.topN));
-  const seeded = [];
+  // As many teams as the admin's count for the next stage (minus the Wild Cards joining there):
+  // all 1st places (best points first), then all 2nd places … then, if the count isn't a whole Top N, the best next-placed teams.
+  syncTargets();
+  const target = stage.toNext ?? stage.topN * stage.groups.length;
+  const rows = stage.groups.map(g => rowsOf(g)), seeded = [];
   const order = (a, b) => b.points - a.points || b.booyahs - a.booyahs || b.placePts - a.placePts || b.kills - a.kills;
-  for (let r = 0; r < stage.topN; r++) per.map(list => list[r]).filter(Boolean).sort(order).forEach(x => seeded.push(x.teamId));
-  // Keep the Grand Final at 12 teams: if the cut leaves fewer, the best of the rest (by points) go through too.
-  const wcNext = !wcJoined() && wcTeams().length && seeded.length + wcTeams().length <= E.MERGE_MAX ? wcTeams().length : 0;
-  if (seeded.length + wcNext < E.FINAL_TEAMS) {
-    const rest = stage.groups.flatMap(g => rowsOf(g).slice(stage.topN)).sort(order);
-    rest.slice(0, E.FINAL_TEAMS - wcNext - seeded.length).forEach(x => seeded.push(x.teamId));
-  }
+  for (let r = 0; r < E.GROUP_SIZE && seeded.length < target; r++)
+    rows.map(list => list[r]).filter(Boolean).sort(order).forEach(x => { if (seeded.length < target) seeded.push(x.teamId); });
   return seeded;
 }
 
 function buildStage(index, teamIds, mode) {
-  const wcIds = (!wcJoined() && wcTeams().length && teamIds.length + wcTeams().length <= E.MERGE_MAX)
-    ? wcTeams().map(t => t.id) : [];
-  const entering = teamIds.length + wcIds.length;
-  const final = entering <= E.FINAL_TEAMS;
+  // Wild Cards join only at the stage the admin chose.
+  const wcIds = (wcOn() && !wcJoined() && bracket().wcStage >= 1 && index === bracket().wcStage) ? wcTeams().map(t => t.id) : [];
+  const entering = teamIds.length + wcIds.length, ps = plan()[index];
+  const final = ps ? ps.final : entering <= E.FINAL_TEAMS;
   const sizes = E.distribute(entering);
   // Leave room for Wild Cards: spread their places over the groups (largest groups first).
   const cap = sizes.slice(); let left = wcIds.length, g = 0;
   while (left > 0) { if (cap[g] > 0) { cap[g]--; left--; } g = (g + 1) % cap.length; }
   const ordered = mode === 'random' ? E.shuffle(teamIds) : teamIds;
   const alloc = mode === 'seeded' ? E.snakeAllocate(ordered, cap) : E.sequentialAllocate(ordered, cap);
-  const stage = { index, name: final ? 'Grand Final' : 'Stage ' + (index + 1), final, status: 'draft', entering, wcJoin: wcIds.length,
-    topN: final ? null : Math.min(11, Math.max(1, Number(index === 0 ? S.settings.stage1Top : S.settings.laterTop) || (index === 0 ? 8 : 6))),
-    matchCount: Math.min(30, Math.max(1, Number(final ? S.settings.finalMatches : S.settings.matchesPerStage) || (final ? E.FINAL_MATCHES : E.MATCHES))), wcTray: wcIds, sizes, groups: [] };
-  stage.groups = alloc.map((ids, gi) => ({ label: final ? 'Final' : String.fromCharCode(65 + (gi % 26)) + (gi >= 26 ? Math.floor(gi / 26) : ''), teamIds: ids, matches: [] }));
+  const stage = { index, name: ps ? ps.name : final ? 'Grand Final' : 'Stage ' + (index + 1), final, status: 'draft', entering, wcJoin: wcIds.length,
+    topN: final || !ps ? null : E.qualifyRule(ps.advancing, sizes.length).topN, extra: final || !ps ? 0 : E.qualifyRule(ps.advancing, sizes.length).extra, toNext: final || !ps ? null : ps.advancing,
+    matchCount: ps ? ps.matches : stageMatches()[index] || (final ? E.FINAL_MATCHES : E.MATCHES), wcTray: wcIds, sizes, groups: [] };
+  stage.groups = alloc.map((ids, gi) => ({ label: final && alloc.length === 1 ? 'Final' : String.fromCharCode(65 + (gi % 26)) + (gi >= 26 ? Math.floor(gi / 26) : ''), teamIds: ids, matches: [] }));
   return stage;
 }
 function makeMatches(stage) {
@@ -255,8 +321,8 @@ function loadSample() {
     { name: 'THxVijay', mobile: '9876543213', email: 'vijay@mail.in', uid: '512345681' }];
   thunder.captainMobile = '9876543210';
   for (let i = 1; i < 252; i++) mk(ADJ[i % ADJ.length] + ' ' + NOUN[Math.floor(i / ADJ.length) % NOUN.length] + (i >= ADJ.length * NOUN.length ? ' ' + i : ''), 'SLOT');
-  ['Creator Kings', 'Stream Legends', 'YT Warriors', 'Live Snipers', 'Insta Rush', 'Shorts Squad'].forEach(n => mk(n, 'WC'));
-  log('Sample data loaded', '252 slot teams + 6 Wild Cards');
+  ['Creator Kings', 'Stream Legends', 'YT Warriors', 'Live Snipers', 'Insta Rush', 'Shorts Squad', 'Clip Kings', 'Reel Raiders', 'Vlog Vipers', 'Meme Mafia', 'Duo Gamers', 'Fan Army'].forEach(n => mk(n, 'WC'));
+  log('Sample data loaded', '252 slot teams + 12 Wild Cards');
   save();
 }
 
@@ -463,7 +529,7 @@ function nextAction(t) {
   const { stage, group, slot } = place;
   if (stage.status === 'draft') return { label: stage.name, main: 'Groups are being prepared', sub: '' };
   if (stage.status === 'done') {
-    if (stage.final) { const r = rowsOf(group).find(x => x.teamId === t.id); return { label: 'Grand Final finished', main: r.rank === 1 ? '🏆 Champions!' : 'Final rank: #' + r.rank, sub: r.points + ' points' }; }
+    if (stage.final) { const r = rowsOf(group).find(x => x.teamId === t.id); return { label: stage.name + ' finished', main: r.rank === 1 ? '🏆 Champions!' : 'Final rank: #' + r.rank, sub: r.points + ' points' }; }
     if ((stage.qualified || []).includes(t.id)) return { label: stage.name + ' finished', main: 'Qualified ✅', sub: 'Next stage groups are being prepared.' };
     const r = rowsOf(group).find(x => x.teamId === t.id);
     return { label: stage.name + ' finished', main: 'Eliminated', sub: 'Rank #' + r.rank + ' in Group ' + GL(group.label) + ' · ' + r.points + ' points' };
@@ -524,7 +590,7 @@ function myPath(t) {
     if (!st || st.status === 'draft') return { name: ps.name, state: 'next', txt: 'Coming up' };
     if (!g) return { name: ps.name, state: 'out', txt: '—' };
     const r = rowsOf(g).find(x => x.teamId === t.id);
-    const where = st.final ? 'Grand Final' : 'Group ' + GL(g.label);
+    const where = gName(st, g);
     if (st.status !== 'done') return { name: ps.name, state: 'live', txt: `${where} · #${r.rank}` };
     if (st.final) return { name: ps.name, state: r.rank === 1 ? 'win' : 'ok', txt: r.rank === 1 ? '🏆 Champions' : 'Finished #' + r.rank };
     return (st.qualified || []).includes(t.id) ? { name: ps.name, state: 'ok', txt: `${where} · #${r.rank} ✓` } : { name: ps.name, state: 'bad', txt: `${where} · #${r.rank} · Out` };
@@ -539,7 +605,7 @@ function teamWaCard(t) {
   const link = pl && pl.stage.status !== 'draft' ? (S.groupLinks[linkKey(pl.stage, pl.group)]?.link || '') : '';
   const msgs = S.notifications.filter(n => n.teamId === t.id).slice(0, 8);
   if (!link && !msgs.length) return '';
-  return `<div class="card" style="margin-top:14px"><div class="row between"><h3>Messages</h3>${link ? `<a class="btn small green" target="_blank" rel="noopener" href="${esc(link)}">Join ${pl.stage.final ? 'Grand Final' : 'Group ' + GL(pl.group.label)} WhatsApp group</a>` : ''}</div>
+  return `<div class="card" style="margin-top:14px"><div class="row between"><h3>Messages</h3>${link ? `<a class="btn small green" target="_blank" rel="noopener" href="${esc(link)}">Join ${gName(pl.stage, pl.group)} WhatsApp group</a>` : ''}</div>
     ${msgs.map(n => `<div style="border-top:1px solid var(--line);padding:8px 0"><div class="small muted">${new Date(n.at).toLocaleString('en-IN')}</div><div style="white-space:pre-line">${esc(n.text)}</div></div>`).join('')}</div>`;
 }
 function statCards(t) {
@@ -549,7 +615,7 @@ function statCards(t) {
   const me = rowsOf(pl.group).find(r => r.teamId === t.id);
   const ic = d => `<svg class="sicon" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
   return `<div class="grid g4" style="margin-top:14px">
-    <div class="card stat">${ic('M7 3h10v3a5 5 0 0 1-4 4.9V14h3v2H8v-2h3v-3.1A5 5 0 0 1 7 6zm-4 1h3v2a3 3 0 0 0 1 2.2A4 4 0 0 1 3 6zm18 0v2a4 4 0 0 1-4 2.2A3 3 0 0 0 18 6V4zM6 18h12v3H6z')}<b>#${me.rank}</b><span>Rank in ${pl.stage.final ? 'Grand Final' : 'Group ' + GL(pl.group.label)}</span></div>
+    <div class="card stat">${ic('M7 3h10v3a5 5 0 0 1-4 4.9V14h3v2H8v-2h3v-3.1A5 5 0 0 1 7 6zm-4 1h3v2a3 3 0 0 0 1 2.2A4 4 0 0 1 3 6zm18 0v2a4 4 0 0 1-4 2.2A3 3 0 0 0 18 6V4zM6 18h12v3H6z')}<b>#${me.rank}</b><span>Rank in ${gName(pl.stage, pl.group)}</span></div>
     <div class="card stat">${ic('M12 2l2.9 6.9L22 9.3l-5.5 4.7L18.2 21 12 17.3 5.8 21l1.7-7L2 9.3l7.1-.4z')}<b>${me.points}</b><span>${esc(pl.stage.name)} points</span></div>
     <div class="card stat">${ic('M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 17.9V17h-2v2.9A8 8 0 0 1 4.1 13H7v-2H4.1A8 8 0 0 1 11 4.1V7h2V4.1A8 8 0 0 1 19.9 11H17v2h2.9A8 8 0 0 1 13 19.9zM12 10a2 2 0 1 0 2 2 2 2 0 0 0-2-2z')}<b>${sum('kills')}</b><span>Total kills</span></div>
     <div class="card stat">${ic('M18 2H6v2H2v3a4 4 0 0 0 4 4h.3A6 6 0 0 0 11 14.9V18H8v2h8v-2h-3v-3.1a6 6 0 0 0 4.7-3.9H18a4 4 0 0 0 4-4V4h-4zM4 7V6h2v3a2 2 0 0 1-2-2zm16 0a2 2 0 0 1-2 2V6h2z')}<b>${sum('booyahs')}</b><span>Booyahs</span></div></div>
@@ -587,9 +653,9 @@ function hero(route) {
   const teams = S.teams.filter(t => t.status === 'approved');
   const ms = allMatches(), played = ms.filter(x => x.m.resultStatus === 'approved').length;
   const kills = ms.filter(x => x.m.resultStatus === 'approved').reduce((a, x) => a + Object.values(x.m.results).reduce((b, r) => b + (r.kills || 0), 0), 0);
-  const p0 = plan()[0], fmt = p0 ? `Groups (Top ${p0.topN ?? '-'} → Top ${Number(S.settings.laterTop) || 6}) then Grand Final` : 'Groups then Grand Final';
+  const fmt = `Groups of 12: ${pathText()} teams`;
   const shown = teams.filter(t => t.entry === 'SLOT').slice(0, 4);
-  const tabs = [['', 'Register', !S.stages.length], ['overview', 'Overview', true], ['groups', 'Group Stage', true], ['bracket', 'Bracket', true], ['schedule', 'Matches', true], ['leaderboard', 'Standings', true], ['info', 'Rules', true]].filter(t => t[2]);
+  const tabs = [['', 'Overview', true], ['register', 'Register', !S.stages.length && S.settings.regOpen], ['groups', 'Group Stage', true], ['bracket', 'Bracket', true], ['schedule', 'Matches', true], ['leaderboard', 'Standings', true], ['info', 'Rules', true]].filter(t => t[2]);
   return `<section class="th">
     <div class="th-art" aria-hidden="true"></div>
     <div class="th-in">
@@ -599,7 +665,7 @@ function hero(route) {
         <div class="th-meta"><span>${IC.pad} Free Fire</span><span>${IC.users} ${usedSlots()}/${S.settings.slots} Teams (4v4 squad)</span><span>${IC.cup} ${esc(fmt)}</span>${S.settings.startDate ? `<span>${IC.cal} ${fmtDate(S.settings.startDate)}</span>` : ''}<span class="badge ${cls}">${esc(label)}</span></div>
       </div>
       <div class="th-side">${S.settings.organiser ? `<div class="th-org"><span>Organized by</span>${tlogo('org-logo')}<b>${esc(S.settings.organiser)}</b></div>` : ''}
-        <div class="row">${!S.stages.length && S.settings.regOpen ? '<a class="btn" href="#/">+ Register team</a>' : '<a class="btn" href="#/leaderboard">View standings</a>'}<a class="btn ghost" href="#/my-team">My Team</a></div></div>
+        <div class="row">${!S.stages.length && S.settings.regOpen ? '<a class="btn" href="#/register">Register now</a>' : '<a class="btn" href="#/leaderboard">View standings</a>'}<a class="btn ghost" href="#/my-team">My Team</a></div></div>
     </div>
     <div class="th-stats">
       <div>${IC.coin}<b>${esc(S.settings.prize || 'Free')}</b><span>Prize pool</span></div>
@@ -607,7 +673,7 @@ function hero(route) {
       <div>${IC.pad}<b>${played}${ms.length ? '/' + ms.length : ''}</b><span>Matches played</span></div>
       <div>${IC.skull}<b>${kills.toLocaleString('en-IN')}</b><span>Total kills</span></div>
     </div>
-    <nav class="ptabs">${tabs.map(([h, l]) => `<a href="#/${h}" class="${(route.split('?')[0] || '') === h ? 'on' : ''}">${l}</a>`).join('')}</nav>
+    <nav class="ptabs">${tabs.map(([h, l]) => `<a href="#/${h}" class="${(route.split('?')[0] === 'overview' ? '' : route.split('?')[0] || '') === h ? 'on' : ''}">${l}</a>`).join('')}</nav>
   </section>`;
 }
 function viewOverview() {
@@ -618,7 +684,7 @@ function viewOverview() {
   const recent = ms.filter(x => x.m.resultStatus === 'approved').slice(-4).reverse();
   const matchCard = ({ st, g, m }) => {
     const top = m.results ? Object.entries(m.results).filter(([, r]) => r.place === 1)[0] : null;
-    return `<div class="mcard"><div class="row between"><span class="small muted">${st.final ? 'Grand Final' : st.name + ' · Group ' + GL(g.label)}</span>${matchBadge(m)}</div>
+    return `<div class="mcard"><div class="row between"><span class="small muted">${st.final ? gName(st, g) : st.name + ' · ' + gName(st, g)}</span>${matchBadge(m)}</div>
       <div class="mtitle">Match ${m.no}${mapShown(m) ? ' · ' + esc(m.map) : ''}</div><div class="small muted">${matchDate(st, m)} · ${m.time}</div>
       ${top ? `<div class="small" style="margin-top:6px">🏆 Booyah: ${tname(top[0])}</div>` : `<div class="avs">${g.teamIds.slice(0, 8).map(id => avatar(team(id), 22)).join('')}${g.teamIds.length > 8 ? `<span class="small muted">+${g.teamIds.length - 8}</span>` : ''}</div>`}</div>`;
   };
@@ -633,7 +699,7 @@ function viewOverview() {
   const perf = (title, k, unit) => `<div class="card"><h3>${title}</h3>${list.length ? topBy(k).map((x, i) => `<div class="prow"><span class="rk">${i + 1}</span>${tname(x.id)}<b>${x[k]}<span class="muted small"> ${unit}</span></b></div>`).join('') : '<p class="muted small">After the first results.</p>'}</div>`;
   const ranking = st && st.status !== 'draft' ? overallRows(st).slice(0, 10) : [];
   let champ = '';
-  if (st && st.final && st.status === 'done') { const r = rowsOf(st.groups[0]); champ = `<div class="champion" style="margin-bottom:16px">${avatar(team(r[0].teamId), 64)}<span class="muted">🏆 Champion</span><b>${esc(team(r[0].teamId).name)}</b><span>${r[0].points} points</span></div>`; }
+  if (st && st.final && st.status === 'done') { const r = finalRows(st); champ = `<div class="champion" style="margin-bottom:16px">${avatar(team(r[0].teamId), 64)}<span class="muted">🏆 Champion</span><b>${esc(team(r[0].teamId).name)}</b><span>${r[0].points} points</span></div>`; }
   return `${champ}
   ${live.length ? `<h2><span class="dot-live"></span> Live now</h2><div class="grid g3">${live.map(matchCard).join('')}</div>` : ''}
   <div class="grid ov">
@@ -642,7 +708,7 @@ function viewOverview() {
       ${ranking.length ? `<div class="card lb"><div class="tw"><table><thead><tr><th>#</th><th>Team</th><th>Group</th><th>${BOOYAH}</th><th>Kills</th><th>Total</th></tr></thead><tbody>
         ${ranking.map((r, i) => `<tr><td class="rk">${i + 1}</td><td>${tname(r.teamId)}</td><td>${GL(r.group)}</td><td>${r.booyahs}</td><td>${r.kills}</td><td><b>${r.points}</b></td></tr>`).join('')}</tbody></table></div>
         <div class="row" style="margin-top:10px"><a class="btn ghost small" href="#/leaderboard">Full leaderboard →</a></div></div>` : `<div class="grid g2">${countdownCard() || '<div class="card glass"><div class="eyebrow">Status</div><div class="prize" style="font-size:26px">Groups coming soon</div></div>'}
-          <div class="card glass"><div class="eyebrow">Slots</div><div class="prize" style="font-size:30px">${usedSlots()}<span class="muted" style="font-size:16px"> / ${S.settings.slots}</span></div><div class="bar" style="margin:10px 0"><i style="width:${Math.min(100, usedSlots() / S.settings.slots * 100)}%"></i></div>${!S.stages.length && S.settings.regOpen ? '<a class="btn" href="#/">Register your team</a>' : ''}</div></div>`}
+          <div class="card glass"><div class="eyebrow">Slots</div><div class="prize" style="font-size:30px">${usedSlots()}<span class="muted" style="font-size:16px"> / ${S.settings.slots}</span></div><div class="bar" style="margin:10px 0"><i style="width:${Math.min(100, usedSlots() / S.settings.slots * 100)}%"></i></div>${!S.stages.length && S.settings.regOpen ? '<a class="btn" href="#/register">Register your team</a>' : ''}</div></div>`}
       <h2>${upcoming.length ? 'Upcoming matches' : recent.length ? 'Latest results' : 'Matches'}</h2>
       ${upcoming.length || recent.length ? `<div class="grid g2">${(upcoming.length ? upcoming : recent).map(matchCard).join('')}</div>` : '<p class="muted">The schedule appears when groups are published.</p>'}
     </div>
@@ -666,7 +732,7 @@ function bracketCols() {
       const played = g.matches.filter(m => m.resultStatus === 'approved').length;
       const shown = st.status === 'done' && !st.final ? rows.filter(r => (st.qualified || []).includes(r.teamId)) : rows;
       const days = [...new Set(g.matches.map(m => m.day))];
-      return { label: st.final ? 'Grand Final' : 'Group ' + GL(g.label), rows: shown, all: rows, played, total: g.matches.length, mine: g.teamIds.includes(me),
+      return { label: gName(st, g), rows: shown, all: rows, played, total: g.matches.length, mine: g.teamIds.includes(me),
         when: (days.length > 1 ? matchDate(st, g.matches[0]) + ' – ' + matchDate(st, g.matches[g.matches.length - 1]) : matchDate(st, g.matches[0])) + ', ' + g.matches[0].time, idx: st.groups.indexOf(g) };
     });
     cols.push({ name: st.name, final: st.final, done: st.status === 'done', groups, wc: st.wcJoin || 0 });
@@ -681,7 +747,7 @@ function viewBracketTeams() {
   const tabs = `<div class="ph-tabs"><a href="#/bracket" class="${phase === 'summary' ? 'on' : ''}"><b>Summary</b><span>${S.stages.length ? S.stages[0].entering + wcTeams().length + ' teams' : 'Coming soon'}</span></a>
     <a href="#/bracket?phase=road" class="${phase === 'road' ? 'on' : ''}"><b>Road map</b><span>Top to bottom</span></a>
     <a href="#/bracket?phase=poster" class="${phase === 'poster' ? 'on' : ''}"><b>Poster</b><span>Wide view</span></a>
-    <a href="#/bracket?phase=wc" class="${wc ? 'on' : ''}"><b>★ Wild Card entry</b><span>Route into ${esc((S.stages.length ? plan() : E.planStages(S.settings.slots, S.settings.wildCards, planOpts())).find(x => x.wcJoin)?.name || 'a later stage')}</span></a>
+    ${plan().some(x => x.wcJoin) || S.stages.some(x => x.wcJoin) ? `<a href="#/bracket?phase=wc" class="${wc ? 'on' : ''}"><b>★ Wild Card entry</b><span>Route into ${esc(plan().find(x => x.wcJoin)?.name || 'a later stage')}</span></a>` : ''}
     ${S.stages.map((x, i) => `<a href="#/bracket?phase=${i}" class="${st === x ? 'on' : ''}"><b><i class="dot-${x.status}"></i>${esc(x.name)}${x.wcJoin ? ' <em class="lx-wc-tag">★ WC</em>' : ''}</b><span>${x.final ? '12 teams' : x.groups.length + ' groups'}${x.wcJoin ? ' · +' + x.wcJoin + ' Wild Cards' : ''}</span></a>`).join('')}</div>`;
   const search = S.stages.length && !wc ? `<div class="ph-search"><input type="search" placeholder="Search your team" value="${esc(bracketQuery)}" data-act="bsearch" aria-label="Search team"></div>` : '';
   return `<div class="row between ph-bar">${tabs}${search}</div>${wc ? viewWcRoute() : phase === 'poster' ? viewBracketPoster() : phase === 'road' ? viewRoadmap(false) : st ? viewPools(st) : viewColBracket() + (S.stages.length ? finalStandings() : '')}`;
@@ -689,7 +755,7 @@ function viewBracketTeams() {
 // Column bracket (reference: left-to-right rounds, small header pills, boxed slots with a score chip).
 // One column per stage; each box is a group with its top teams and points.
 function viewColBracket() {
-  const p = S.stages.length ? plan() : E.planStages(S.settings.slots, wcPlanned() || S.settings.wildCards, planOpts()), me = myTeamId();
+  const p = plan(), me = myTeamId();
   const q = bracketQuery.trim().toLowerCase();
   const MAXBOX = 8;
   const cols = p.map((ps, i) => {
@@ -700,18 +766,18 @@ function viewColBracket() {
     if (b) {
       const list = b.groups.map((g, gi) => ({ g, gi, rows: rowsOf(g) }));
       const hit = list.filter(x => (me && x.g.teamIds.includes(me)) || (q && x.g.teamIds.some(id => (team(id)?.name || '').toLowerCase().includes(q))));
-      const pick = (hit.length ? hit.concat(list.filter(x => !hit.includes(x))) : list).slice(0, ps.final ? 1 : MAXBOX);
+      const pick = (hit.length ? hit.concat(list.filter(x => !hit.includes(x))) : list).slice(0, ps.final ? b.groups.length : MAXBOX);
       const show = ps.final ? 12 : Math.min(3, topN || 3);
       boxes = pick.map(({ g, gi, rows }) => {
         const done = g.matches.filter(m => m.resultStatus === 'approved').length;
         const top = rows.slice(0, show);
         const extra = me && !top.some(r => r.teamId === me) && rows.find(r => r.teamId === me);
         const line = (r) => { const q2 = !ps.final && r.rank <= topN, mine = r.teamId === me; return `<div class="cb-row${mine ? ' me' : ''}${q && (team(r.teamId)?.name || '').toLowerCase().includes(q) ? ' hit' : ''}"><span class="cb-seed">${r.rank}</span>${tname(r.teamId)}<b class="${q2 || (ps.final && r.rank === 1 && b.status === 'done') ? 'on' : ''}">${done ? r.points : '–'}</b></div>`; };
-        return `<div class="cb-box"><span class="cb-no">${ps.final ? '★' : gi + 1}</span><a class="cb-h" href="#/leaderboard?stage=${i}">${ps.final ? 'Grand Final' : 'Group ' + GL(g.label)} <span>${done}/${g.matches.length}</span></a>${top.map(line).join('')}${extra ? '<div class="cb-gap">⋯</div>' + line(extra) : ''}${!ps.final && g.teamIds.length > show ? `<div class="cb-more">+${g.teamIds.length - show} more teams</div>` : ''}</div>`;
+        return `<div class="cb-box"><span class="cb-no">${ps.final ? '★' : gi + 1}</span><a class="cb-h" href="#/leaderboard?stage=${i}">${gName(b, g)} <span>${done}/${g.matches.length}</span></a>${top.map(line).join('')}${extra ? '<div class="cb-gap">⋯</div>' + line(extra) : ''}${!ps.final && g.teamIds.length > show ? `<div class="cb-more">+${g.teamIds.length - show} more teams</div>` : ''}</div>`;
       }).join('') + (!ps.final && b.groups.length > MAXBOX ? `<a class="cb-all" href="#/bracket?phase=${i}">Show all ${b.groups.length} groups →</a>` : '');
     } else {
       const n = Math.min(ps.final ? 1 : ps.sizes.length, ps.final ? 1 : 4);
-      boxes = Array.from({ length: n }, (_, k) => `<div class="cb-box tbd"><span class="cb-no">${ps.final ? '★' : k + 1}</span><div class="cb-h">${ps.final ? 'Grand Final' : 'Group ' + (k + 1)} <span>TBD</span></div>${'<div class="cb-row"><span class="cb-seed">–</span><span class="muted">To be decided</span><b>–</b></div>'.repeat(2)}</div>`).join('') + (!ps.final && ps.sizes.length > n ? `<div class="cb-more">+${ps.sizes.length - n} more groups</div>` : '');
+      boxes = Array.from({ length: n }, (_, k) => `<div class="cb-box tbd"><span class="cb-no">${ps.final ? '★' : k + 1}</span><div class="cb-h">${ps.final ? (ps.sizes.length > 1 ? esc(ps.name) + ' · Group ' + (k + 1) : esc(ps.name)) : 'Group ' + (k + 1)} <span>TBD</span></div>${'<div class="cb-row"><span class="cb-seed">–</span><span class="muted">To be decided</span><b>–</b></div>'.repeat(2)}</div>`).join('') + (!ps.final && ps.sizes.length > n ? `<div class="cb-more">+${ps.sizes.length - n} more groups</div>` : '');
     }
     return `<div class="cb-col${ps.final ? ' final' : ''}"><div class="cb-pill">${head}</div>${ps.wcJoin ? `<div class="cb-wc">★ ${ps.wcJoin} Wild Cards join</div>` : ''}${boxes}</div>`;
   }).join('');
@@ -719,30 +785,30 @@ function viewColBracket() {
 }
 // Roadmap: the whole tournament, top to bottom. Used on the public Bracket page and the admin Stages page.
 function viewRoadmap(admin) {
-  const p = S.stages.length ? plan() : E.planStages(S.settings.slots, wcPlanned() || S.settings.wildCards, planOpts());
+  const p = plan();
   const rows = p.map((ps, i) => {
     const b = S.stages[i], live = b && b.status === 'published', done = b && b.status === 'done';
     const entering = b ? b.entering : ps.entering, groups = b ? b.groups.length : ps.sizes.length;
-    const mt = b ? (b.matchCount || ps.matches) : ps.matches, topN = b && !b.final ? b.topN : ps.topN;
+    const mt = b ? (b.matchCount || ps.matches) : ps.matches, topN = ps.topN, extra = ps.extra || 0;
     const adv = b && done && !ps.final ? (b.qualified || []).length : ps.advancing;
     const state = done ? ['Completed', 'b-ok'] : live ? ['Live', 'b-bad'] : b ? ['Draft', 'b-warn'] : ['Coming up', ''];
-    const g0 = b && ps.final ? b.groups[0] : null, champ = g0 && done ? rowsOf(g0)[0] : null;
+    const champ = b && ps.final && done ? finalRows(b)[0] : null;
     const date = b && stageStart(b) ? matchDate(b, { day: 1 }) : '';
     return `<div class="rm-step${live ? ' live' : ''}${done ? ' done' : ''}${ps.final ? ' final' : ''}">
       <div class="rm-no">${ps.final ? '★' : String(i + 1).padStart(2, '0')}</div>
       <div class="rm-card"><div class="rm-main"><div class="rm-name">${esc(ps.name)} <span class="badge ${state[1]}">${state[0]}</span></div>
           <div class="rm-facts"><span><b>${entering}</b> teams</span><span><b>${groups}</b> group${groups > 1 ? 's' : ''}</span><span><b>MT ${mt}</b> matches each</span>${date ? `<span>${date}</span>` : ''}${ps.final && rushOn() ? `<span>Champion Rush · ${rushTarget()} pts</span>` : ''}</div></div>
-        <div class="rm-out">${ps.final ? (champ ? `<span class="rm-champ">Champion</span>${tname(champ.teamId)}` : '<span class="rm-champ">Champion</span><span class="muted">To be decided</span>') : `<span class="rm-top">Top ${topN}</span><span class="muted small">per group qualify</span>`}</div>
+        <div class="rm-out">${ps.final ? (champ ? `<span class="rm-champ">Champion</span>${tname(champ.teamId)}` : '<span class="rm-champ">Champion</span><span class="muted">To be decided</span>') : `<span class="rm-top">Top ${topN}</span><span class="muted small">per group qualify${extra ? ` + ${extra} best ${ordinal(topN + 1)}` : ''}</span>`}</div>
         ${b && b.status !== 'draft' ? `<a class="btn ghost small" href="${admin ? '#/leaderboard?stage=' + i : '#/bracket?phase=' + i}">View</a>` : ''}</div>
       ${ps.wcJoin ? `<div class="rm-wc"><b>★ ${ps.wcJoin} Wild Cards</b><span>join here</span></div>` : ''}
-    </div>${ps.final ? '' : `<div class="rm-link"><i></i><span><b>${adv}</b> teams advance${ps.fill && !(b && done) ? ` (incl. best ${ps.fill} of the rest, so the final has 12)` : ''}</span></div>`}`;
+    </div>${ps.final ? '' : `<div class="rm-link"><i></i><span><b>${adv}</b> teams advance${extra && !(b && done) ? ` (Top ${topN} of every group + the ${extra} best ${ordinal(topN + 1)}-placed teams)` : ''}</span></div>`}`;
   }).join('');
   return `<div class="rm">${rows}</div>`;
 }
 // Two-lane route: Wild Card entry above, main tournament below, a dashed gold line where the Wild Cards join.
 function viewWcRoute() {
   // Before groups exist, plan from the slot limit (e.g. 252), not from the few teams registered so far.
-  const p = S.stages.length ? plan() : E.planStages(S.settings.slots, wcPlanned() || S.settings.wildCards, planOpts()), j = p.findIndex(x => x.wcJoin), n = p.length;
+  const p = plan(), j = p.findIndex(x => x.wcJoin), n = p.length;
   const js = j >= 0 ? p[j] : null, wcN = js ? js.wcJoin : 0;
   const built = i => S.stages[i] && S.stages[i].status !== 'draft' ? S.stages[i] : null;
   const state = i => { const b = built(i); return b ? (b.status === 'done' ? ['Completed', 'done'] : ['Live', 'live']) : ['Coming up', 'next']; };
@@ -751,8 +817,8 @@ function viewWcRoute() {
   const slots = Array.from({ length: wcN }, (_, k) => joined[k] ? `<span class="rt-chip named">${avatar(team(joined[k]), 18)}${esc(team(joined[k]).name)}</span>` : `<span class="rt-chip">★ Wild Card ${k + 1}</span>`).join('');
   const cards = (ps, i) => {
     const b = built(i), sizes = b ? b.groups.map(g => g.teamIds.length) : ps.sizes, labels = b ? b.groups.map(g => GL(g.label)) : sizes.map((_, k) => String.fromCharCode(65 + (k % 26)));
-    const rule = ps.final ? 'Final ranking' : 'Top ' + ps.topN + ' qualify';
-    return sizes.slice(0, 2).map((z, k) => `<div class="rt-card${i === j ? ' wc' : ''}"><b>${ps.final ? 'Grand Final' : 'Group ' + labels[k]}</b><span>${z} teams · ${rule}</span></div>`).join('')
+    const rule = ps.final ? 'Final ranking' : qualText(ps.topN, ps.extra) + ' qualify';
+    return sizes.slice(0, 2).map((z, k) => `<div class="rt-card${i === j ? ' wc' : ''}"><b>${ps.final ? (sizes.length > 1 ? esc(ps.name) + ' · Group ' + (k + 1) : esc(ps.name)) : 'Group ' + labels[k]}</b><span>${z} teams · ${rule}</span></div>`).join('')
       + (sizes.length > 2 ? `<div class="rt-more">+${sizes.length - 2} more groups</div>` : '');
   };
   const cols = `grid-template-columns:repeat(${n}, minmax(168px, 1fr))`;
@@ -781,7 +847,7 @@ function viewPools(st) {
   const q = bracketQuery.trim().toLowerCase(), me = myTeamId(), next = S.stages[st.index + 1];
   const statusOf = g => { const d = g.matches.filter(m => m.resultStatus === 'approved').length; return st.status === 'draft' ? ['Upcoming', ''] : d === g.matches.length ? ['Complete', 'b-ok'] : d ? ['In progress', 'b-acc'] : ['Not started', '']; };
   const groups = st.groups.filter(g => !q || g.teamIds.some(id => (team(id)?.name || '').toLowerCase().includes(q)));
-  const adv = st.final ? 'Final ranking' : `Top ${st.topN}/group → ${next ? esc(next.name) : 'next stage'}`;
+  const adv = st.final ? 'Final ranking' : `Top ${st.topN}/group${st.extra ? ` + ${st.extra} best ${ordinal(st.topN + 1)}` : ''} → ${next ? esc(next.name) : 'next stage'}`;
   return `<div class="card glass ph-head"><div class="row between"><div><h2 style="margin:0">${esc(st.name)}</h2>
       <div class="ph-facts"><span>${st.groups.length} group${st.groups.length > 1 ? 's' : ''}</span><span>${st.entering} teams</span>${st.wcJoin ? `<span>incl. ${st.wcJoin} Wild Cards</span>` : ''}<span>${adv}</span></div></div>
       <span class="badge ${st.status === 'done' ? 'b-ok' : st.status === 'published' ? 'b-acc' : ''}">${st.status === 'done' ? 'Complete' : st.status === 'published' ? 'Live' : 'Upcoming'}</span></div></div>
@@ -789,7 +855,7 @@ function viewPools(st) {
       const rows = rowsOf(g), [sl, sc] = statusOf(g);
       const hit = id => q && (team(id)?.name || '').toLowerCase().includes(q);
       const shownIds = [...rows.slice(0, st.final ? 12 : st.topN).map(r => r.teamId), ...rows.filter(r => hit(r.teamId) || r.teamId === me).map(r => r.teamId)].filter((v, i, a) => a.indexOf(v) === i);
-      return `<div class="pool${g.teamIds.includes(me) ? ' mine' : ''}"><div class="pool-h"><b>${st.final ? 'Grand Final' : 'Group ' + GL(g.label)}</b><span class="badge ${sc}">${sl}</span>
+      return `<div class="pool${g.teamIds.includes(me) ? ' mine' : ''}"><div class="pool-h"><b>${gName(st, g)}</b><span class="badge ${sc}">${sl}</span>
           <a class="small" href="#/leaderboard?stage=${st.index}">Full table →</a></div>
         <div class="chips">${shownIds.map(id => { const r = rows.find(x => x.teamId === id), up = st.status === 'done' && (st.qualified || []).includes(id), top = !st.final && r.rank <= st.topN;
           return `<span class="tchip${up || (st.final && r.rank === 1 && st.status === 'done') ? ' up' : top && st.status !== 'done' ? ' lead' : ''}${hit(id) ? ' hit' : ''}${id === me ? ' me' : ''}">${avatar(team(id), 18)}<span>${esc(team(id).name)}</span>${team(id).entry === 'WC' ? '<b class="lx-wcchip">WC</b>' : ''}${g.matches.some(m => m.resultStatus === 'approved') ? `<em>${r.points}</em>` : ''}${up ? '<i>→</i>' : ''}</span>`; }).join('')}
@@ -800,7 +866,7 @@ function viewPools(st) {
 function finalStandings() {
   const last = S.stages[S.stages.length - 1];
   if (!last.final || last.status !== 'done') return '';
-  const rows = rowsOf(last.groups[0]);
+  const rows = finalRows(last);
   const medal = ['🥇', '🥈', '🥉'];
   return `<h2 style="margin-top:26px">Final standings</h2><div class="card glass"><div class="tw"><table><thead><tr><th>Place</th><th>Team</th><th>${BOOYAH}</th><th>Kills</th><th>Points</th></tr></thead><tbody>
     ${rows.map(r => `<tr class="${r.rank <= 3 ? 'podium p' + r.rank : ''}"><td class="rk">${medal[r.rank - 1] || r.rank + (r.rank > 3 ? 'th' : '')}</td><td>${tname(r.teamId)}</td><td>${r.booyahs}</td><td>${r.kills}</td><td><b>${r.points}</b></td></tr>`).join('')}</tbody></table></div></div>`;
@@ -809,7 +875,7 @@ function viewBracketPoster() {
   if (!S.stages.length) return `<div class="lx lx-empty"><h2 class="lx-title">${esc(S.settings.name)}</h2><p>The bracket appears when the first groups are published.</p></div>`;
   const cols = bracketCols(), me = myTeamId();
   const last = S.stages[S.stages.length - 1];
-  const champ = last.final && last.status === 'done' ? rowsOf(last.groups[0])[0] : null;
+  const champ = last.final && last.status === 'done' ? finalRows(last)[0] : null;
   const stageOf = name => S.stages.find(x => x.name === name);
   const isWc = id => team(id)?.entry === 'WC';
   const plate = (r, side, score, hi) => `<div class="lx-plate ${side}${hi ? ' hi' : ''}${r.teamId === me ? ' me' : ''}${isWc(r.teamId) ? ' wc' : ''}">${avatar(team(r.teamId), 22)}<span>${esc(team(r.teamId)?.name || '')}</span>${isWc(r.teamId) ? '<b class="lx-wcchip">WC</b>' : ''}<i>${score}</i></div>`;
@@ -843,10 +909,11 @@ function viewBracketPoster() {
     return { c, html: (wcIds.length ? wcBlock(c, side, wcIds) : '') + (gs.length > 3 ? summary(gs, c, side) : gs.map(g => block(g, c, side)).join('')) };
   });
   const L = sideCols('L'), R = sideCols('R').reverse();
-  const fc = cols.find(c => c.final), fg = fc && !fc.tbd ? fc.groups[0] : null;
+  const fst = S.stages.find(x => x.final && x.status !== 'draft'), finN = plan().slice(-1)[0]?.entering || 12;
+  const fg = fst ? { all: finalRows(fst), played: fst.groups.reduce((a, g) => a + g.matches.filter(m => m.resultStatus === 'approved').length, 0) } : null;
   const col = (x, side) => `<div class="lx-col" data-side="${side}"><div class="lx-stack">${x.html}</div></div>`;
   const head = c => esc(c.name) + (c.wc ? ` <span class="lx-wc-tag">★ +${c.wc} WC</span>` : '');
-  const heads = [...L.map(x => head(x.c)), 'Grand Final', ...R.map(x => head(x.c))];
+  const heads = [...L.map(x => head(x.c)), esc(plan().slice(-1)[0]?.name || 'Grand Final'), ...R.map(x => head(x.c))];
   return `<div class="lx">
     <div class="lx-rays" aria-hidden="true"></div>
     <h2 class="lx-title">${esc(S.settings.name)} ${new Date(S.settings.startDate || Date.now()).getFullYear()}</h2>
@@ -856,7 +923,7 @@ function viewBracketPoster() {
       <div class="lx-col lx-center" data-side="C"><div class="lx-stack">
         <div class="lx-champ" data-col><div class="lx-champ-t">${champ ? '¡Champion!' : 'Champion'}</div><div class="lx-champ-n">${champ ? esc(team(champ.teamId).name) : 'To be decided'}</div>
           <div class="lx-cup">${TROPHY}</div>${champ ? `<div class="lx-crest">${avatar(team(champ.teamId), 64)}<b>${champ.points} pts</b></div>` : ''}</div>
-        ${fg ? `<div class="lx-final">${fg.all.slice(0, 4).map((r, i) => plate(r, 'L', fg.played ? r.points : '–', i === 0 && champ)).join('')}${fg.all.length > 4 ? `<a class="lx-more" href="#/leaderboard?stage=${S.stages.length - 1}">All 12 finalists →</a>` : ''}</div>` : `<div class="lx-final"><div class="lx-plate L"><span>12 finalists</span><i>–</i></div></div>`}
+        ${fg ? `<div class="lx-final">${fg.all.slice(0, 4).map((r, i) => plate(r, 'L', fg.played ? r.points : '–', i === 0 && champ)).join('')}${fg.all.length > 4 ? `<a class="lx-more" href="#/leaderboard?stage=${S.stages.length - 1}">All ${fg.all.length} finalists →</a>` : ''}</div>` : `<div class="lx-final"><div class="lx-plate L"><span>${finN} finalists</span><i>–</i></div></div>`}
       </div></div>
       ${R.map(x => col(x, 'R')).join('')}
     </div><svg class="vb-lines lx-lines" aria-hidden="true"></svg></div>
@@ -898,7 +965,7 @@ function viewSchedule() {
   const st = pickStage();
   if (!st || st.status === 'draft') return `<h1>Schedule</h1><p class="muted">Schedule is not published yet.</p>`;
   const rows = st.groups.flatMap(g => g.matches.map(m => ({ g, m }))).sort((a, b) => a.m.day - b.m.day || a.m.time.localeCompare(b.m.time) || st.groups.indexOf(a.g) - st.groups.indexOf(b.g))
-    .map(({ g, m }) => `<tr><td>${matchDate(st, m)}</td><td>${m.time}</td><td>${st.final ? 'Final' : 'Group ' + GL(g.label)}</td><td>Match ${m.no}</td><td>${mapShown(m) ? esc(m.map) : '<span class="muted">—</span>'}</td><td>${matchBadge(m)}</td><td>${m.resultStatus === 'approved' ? `<a class="btn ghost small" href="#/match/${encodeURIComponent(m.id)}">Check result</a>` : ''}</td></tr>`).join('');
+    .map(({ g, m }) => `<tr><td>${matchDate(st, m)}</td><td>${m.time}</td><td>${gName(st, g, 1)}</td><td>Match ${m.no}</td><td>${mapShown(m) ? esc(m.map) : '<span class="muted">—</span>'}</td><td>${matchBadge(m)}</td><td>${m.resultStatus === 'approved' ? `<a class="btn ghost small" href="#/match/${encodeURIComponent(m.id)}">Check result</a>` : ''}</td></tr>`).join('');
   return `<h1>Schedule</h1><p class="sub">${st.name}</p>${stagePicker('schedule')}<div class="tw"><table><thead><tr><th>Date</th><th>Time</th><th>Group</th><th>Match</th><th>Map</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 // Public: the result of one finished match (opened from Schedule → Check result).
@@ -906,13 +973,52 @@ function viewMatchResult(id) {
   const fm = findMatch(id);
   if (!fm || fm.m.resultStatus !== 'approved' || !fm.m.results) return `<a class="small" href="#/schedule">← Schedule</a><h1>Match result</h1><p class="muted">This result is not published yet.</p>`;
   const { st, g, m } = fm;
-  const order = Object.entries(m.results).sort((a, b) => (a[1].noShow ? 99 : a[1].place) - (b[1].noShow ? 99 : b[1].place));
   return `<a class="small" href="#/schedule?stage=${S.stages.indexOf(st)}">← Schedule</a>
-  <h1>${esc(st.name)} · ${st.final ? 'Final' : 'Group ' + GL(g.label)} · Match ${m.no}</h1><p class="sub">${esc(m.map)} · ${matchDate(st, m)}, ${m.time}</p>
-  <div class="card lb"><div class="tw"><table><thead><tr><th>Pos</th><th>Team</th><th>Pos pts</th><th>Kills</th><th>Total</th></tr></thead><tbody>
-  ${order.map(([tid, r]) => { const pp = r.noShow ? 0 : (E.PLACEMENT_POINTS[r.place - 1] || 0);
-    return `<tr class="${r.place === 1 ? 'q' : ''}"><td class="rk">${r.noShow ? '–' : r.place}</td><td>${tname(tid)}${r.place === 1 ? ' <span class="badge b-acc">Booyah</span>' : ''}${r.noShow ? ' <span class="badge b-bad">No-show</span>' : ''}</td><td>${pp}</td><td>${r.noShow ? 0 : r.kills}</td><td class="pts"><b>${r.noShow ? 0 : pp + r.kills * E.POINTS_PER_KILL}</b></td></tr>`; }).join('')}
-  </tbody></table></div></div>`;
+  <h1>${esc(st.name)} · ${gName(st, g, 1)} · Match ${m.no}</h1><p class="sub">${esc(m.map)} · ${matchDate(st, m)}, ${m.time}</p>
+  <div class="card lb">${resultTable(m, false)}</div>`;
+}
+// ---------- player eliminations (from screenshot results) ----------
+const pname = (teamId, p) => p.sub ? p.name : (team(teamId)?.players[p.slot]?.name || p.name);
+// One table per match: each team with its players under it (Pos, Team and the team totals span the team's player rows).
+// admin adds the registered UID and how each name was checked.
+function resultTable(m, admin) {
+  const order = Object.entries(m.results || {}).sort((a, b) => (a[1].noShow ? 99 : a[1].place) - (b[1].noShow ? 99 : b[1].place));
+  const pc = admin ? 4 : 2;
+  const body = order.map(([tid, r]) => {
+    const pp = r.noShow ? 0 : (E.PLACEMENT_POINTS[r.place - 1] || 0), kills = r.noShow ? 0 : r.kills | 0, ps = r.noShow ? [] : (r.players || []), n = Math.max(ps.length, 1);
+    const lead = `<td class="rk" rowspan="${n}">${r.noShow ? '–' : r.place}</td><td rowspan="${n}">${tname(tid)}${r.place === 1 ? ' <span class="badge b-acc">Booyah</span>' : ''}${r.noShow ? ' <span class="badge b-bad">No-show</span>' : ''}</td>`;
+    const tot = `<td class="num" rowspan="${n}">${kills}</td><td class="num" rowspan="${n}">${pp}</td><td class="num pts" rowspan="${n}"><b>${pp + kills * E.POINTS_PER_KILL}</b></td>`;
+    if (!ps.length) return `<tbody class="res-grp"><tr class="${r.place === 1 ? 'q' : ''}">${lead}<td colspan="${pc}" class="muted small">${r.noShow ? 'Did not play' : 'Player eliminations not recorded (entered by hand)'}</td>${tot}</tr></tbody>`;
+    return `<tbody class="res-grp">${ps.map((p, j) => { const rp = !p.sub && team(tid)?.players[p.slot];
+      return `<tr class="${r.place === 1 ? 'q' : ''}">${j ? '' : lead}<td>${esc(pname(tid, p))}${p.sub ? ' <span class="badge b-warn">Substitute</span>' : ''}</td>${admin ? `<td class="small muted">${p.sub ? 'Not registered' : esc(rp?.uid || '—')}</td>` : ''}<td class="num"><b>${p.kills}</b></td>${admin ? `<td>${p.verified ? `<span class="badge b-warn" title="OCR read: ${esc(p.ocr || '')}">Admin verified</span>` : `<span class="badge b-ok">OCR ${Math.round((p.conf || 0) * 100)}%</span>`}</td>` : ''}${j ? '' : tot}</tr>`; }).join('')}</tbody>`;
+  }).join('');
+  return `<div class="tw"><table class="res-table"><thead><tr><th>Pos</th><th>Team</th><th>In Game Name</th>${admin ? '<th>UID</th>' : ''}<th>Elims</th>${admin ? '<th>Check</th>' : ''}<th>Team kills</th><th>Pos pts</th><th>Total</th></tr></thead>${body}</table></div>`;
+}
+function playerBoard(st) {
+  const done = st.groups.flatMap(g => g.matches.filter(m => m.resultStatus === 'approved' && m.results));
+  const rows = E.playerStandings(done.map(m => m.results));
+  if (!rows.length) return `<div class="card"><p class="muted">No player eliminations yet. They appear here once results are published from screenshots.</p></div>`;
+  return `<div class="card lb"><div class="tw"><table><thead><tr><th>#</th><th>In Game Name</th><th>Team</th><th>Matches</th><th>Best</th><th>Elims</th></tr></thead><tbody>
+    ${rows.slice(0, 200).map(r => `<tr class="${r.rank <= 3 ? 'q' : ''}"><td class="rk">${r.rank}</td><td>${esc(r.sub ? r.name : (team(r.teamId)?.players[r.slot]?.name || r.name))}${r.sub ? ' <span class="badge b-warn">Sub</span>' : ''}</td><td>${tname(r.teamId)}</td><td>${r.matches}</td><td>${r.best}</td><td><b>${r.kills}</b></td></tr>`).join('')}
+  </tbody></table></div>${rows.length > 200 ? `<p class="small muted">Top 200 of ${rows.length} players.</p>` : ''}</div>`;
+}
+function dashResults() {
+  const all = S.stages.flatMap(st => st.groups.flatMap(g => g.matches.filter(m => m.resultStatus === 'approved' && m.results).map(m => ({ st, g, m }))));
+  if (!all.length) return `<div class="card dash-results"><div class="row between"><h3>Match results</h3><a class="btn small" href="#/admin/ocr">Upload screenshots</a></div><p class="muted small">No published results yet.</p></div>`;
+  const pr = params();
+  const sel = all.find(x => x.m.id === pr.mr) || [...all].reverse().find(x => Object.values(x.m.results).some(r => r.players)) || all[all.length - 1];
+  const { st, g, m } = sel, label = x => `${x.st.name} · ${gName(x.st, x.g, 1)} · M${x.m.no}${x.m.source === 'ocr' ? ' · screenshots' : ''}`;
+  const order = Object.entries(m.results).sort((a, b) => (a[1].noShow ? 99 : a[1].place) - (b[1].noShow ? 99 : b[1].place));
+  const players = order.flatMap(([tid, r]) => (r.players || []).map(p => ({ tid, p })));
+  const kills = order.reduce((a, [, r]) => a + (r.noShow ? 0 : r.kills | 0), 0);
+  const top = players.slice().sort((a, b) => b.p.kills - a.p.kills)[0];
+  const boo = order.find(([, r]) => r.place === 1);
+  const opts = all.slice().reverse().slice(0, 300).map(x => `<option value="${x.m.id}" ${x === sel ? 'selected' : ''}>${esc(label(x))}</option>`).join('');
+  return `<div class="card dash-results"><div class="row between"><h3>Match results</h3><div class="row"><select data-act="dashMatch" aria-label="Match">${opts}</select><a class="btn small" href="#/admin/ocr">Upload screenshots</a></div></div>
+    <div class="kgrid mini"><div class="kcard"><span>Booyah</span><b class="sm">${boo ? tname(boo[0]) : '—'}</b></div><div class="kcard"><span>Teams</span><b>${order.filter(([, r]) => !r.noShow).length}<small>/${order.length}</small></b></div>
+      <div class="kcard"><span>Total elims</span><b>${kills}</b></div><div class="kcard"><span>Top fragger</span><b class="sm">${top ? esc(pname(top.tid, top.p)) + ' · ' + top.p.kills : '—'}</b></div></div>
+    ${resultTable(m, true)}
+    <div class="row between small muted" style="margin-top:8px"><span>${esc(m.map)} · ${matchDate(st, m)}, ${m.time}</span><a href="#/match/${encodeURIComponent(m.id)}">Public match page →</a></div></div>`;
 }
 function matchBadge(m) {
   if (m.resultStatus === 'approved') return '<span class="badge b-ok">Result published</span>';
@@ -942,7 +1048,7 @@ function lbRow(stage, g, r, rank, cls, withGroup) {
 function standingsTable(stage, g) {
   const rows = rowsOf(g);
   const done = g.matches.filter(m => m.resultStatus === 'approved').length, waiting = g.matches.filter(m => m.resultStatus === 'submitted').length;
-  return `<div class="card lb"><div class="row between"><h3>${stage.final ? 'Grand Final' : 'Group ' + GL(g.label)}</h3><span class="muted small">${done}/${g.matches.length} matches${waiting ? ` · ${waiting} result${waiting > 1 ? 's' : ''} being checked` : ''}</span></div>
+  return `<div class="card lb"><div class="row between"><h3>${gName(stage, g)}</h3><span class="muted small">${done}/${g.matches.length} matches${waiting ? ` · ${waiting} result${waiting > 1 ? 's' : ''} being checked` : ''}</span></div>
   <div class="tw"><table><thead><tr><th>#</th><th>Team</th><th title="Booyahs">${BOOYAH}</th><th>Pos pts</th><th>Kills</th><th>Total</th></tr></thead><tbody>
   ${rows.map(r => lbRow(stage, g, r, r.rank, `${!stage.final && r.rank <= stage.topN ? 'q' : ''}${stage.final && r.rank <= 3 && stage.status === 'done' ? ' podium p' + r.rank : ''}`, false)).join('')}
   </tbody></table></div></div>`;
@@ -956,28 +1062,27 @@ function viewLeaderboard() {
   const st = pickStage();
   if (!st || st.status === 'draft') return `<h1>Leaderboard</h1><p class="muted">No published stage yet.</p>`;
   let champ = '';
-  if (st.final && st.status === 'done') { const r = rowsOf(st.groups[0]); champ = `<div class="champion"><span class="muted">🏆 Champion</span><b>${esc(team(r[0].teamId).name)}</b><span>${r[0].points} points · 2nd ${esc(team(r[1].teamId).name)} · 3rd ${esc(team(r[2].teamId).name)}</span></div><br>`; }
+  if (st.final && st.status === 'done') { const r = finalRows(st); champ = `<div class="champion"><span class="muted">🏆 Champion</span><b>${esc(team(r[0].teamId).name)}</b><span>${r[0].points} points · 2nd ${esc(team(r[1].teamId).name)} · 3rd ${esc(team(r[2].teamId).name)}</span></div><br>`; }
   const view = params().view || 'groups';
   const q = `stage=${S.stages.indexOf(st)}`;
-  const toggle = st.groups.length > 1 ? `<div class="seg"><a href="#/leaderboard?${q}&view=groups" class="${view === 'groups' ? 'on' : ''}">By group</a><a href="#/leaderboard?${q}&view=overall" class="${view === 'overall' ? 'on' : ''}">Overall</a></div>` : '';
+  const toggle = `<div class="seg"><a href="#/leaderboard?${q}&view=groups" class="${view === 'groups' ? 'on' : ''}">${st.groups.length > 1 ? 'By group' : 'Teams'}</a>${st.groups.length > 1 ? `<a href="#/leaderboard?${q}&view=overall" class="${view === 'overall' ? 'on' : ''}">Overall</a>` : ''}<a href="#/leaderboard?${q}&view=players" class="${view === 'players' ? 'on' : ''}">Players</a></div>`;
   const waiting = st.groups.reduce((a, g) => a + g.matches.filter(m => m.resultStatus === 'submitted').length, 0);
   const overall = () => `<div class="card lb"><div class="tw"><table><thead><tr><th>#</th><th>Team</th><th>Group</th><th title="Booyahs">${BOOYAH}</th><th>Pos pts</th><th>Kills</th><th>Total</th></tr></thead><tbody>
     ${overallRows(st).map((r, i) => lbRow(st, r.g, r, i + 1, '', true)).join('')}</tbody></table></div></div>`;
   return `<div class="row between"><div><h1>Leaderboard</h1><p class="sub">${st.name}${st.topN ? ' · highlighted = qualifies' : ' · both final days combined'} · click a team for points per match</p></div>${toggle}</div>${stagePicker('leaderboard')}${champ}
   ${st.final && rushOn() ? (() => { const rs = rushState(st.groups[0]); return `<div class="notice" style="margin-bottom:12px"><b>Champion Rush · target ${rs.target} points.</b> ${rs.champion ? esc(team(rs.champion)?.name || '') + ' won a Booyah on match point in Match ' + rs.wonIn + ' and is the champion.' : rs.matchPoint.length ? 'On match point: ' + rs.matchPoint.map(id => esc(team(id)?.name || '')).join(', ') + '. The first of them to win a Booyah is the champion.' : 'No team has reached the target yet.'}</div>`; })() : ''}
   ${waiting ? `<div class="notice" style="margin-bottom:12px">${waiting} match result${waiting > 1 ? 's are' : ' is'} being checked by the admin. ${waiting > 1 ? 'They count' : 'It counts'} once approved.${session.role === 'admin' ? ' <a href="#/admin/results">Approve now →</a>' : ''}</div>` : ''}
-  ${view === 'overall' ? overall() : `<div class="grid">${st.groups.map(g => standingsTable(st, g)).join('')}</div>`}`;
+  ${view === 'players' ? playerBoard(st) : view === 'overall' ? overall() : `<div class="grid">${st.groups.map(g => standingsTable(st, g)).join('')}</div>`}`;
 }
 function planLine(p) {
-  return `<div class="flowline">${p.map(s => `<span class="${s.final ? 'final' : s.wcJoin ? 'wc' : ''}">${s.final ? '🏆 Grand Final · 12 teams · MT ' + s.matches : `${s.name}: ${s.entering}${s.wcJoin ? ' (incl. ' + s.wcJoin + ' WC)' : ''} → ${s.sizes.length} groups · MT ${s.matches} → Top ${s.topN} → ${s.advancing}`}</span>`).join('<span style="border:0;background:none">→</span>')}</div>`;
+  return `<div class="flowline">${p.map(s => `<span class="${s.final ? 'final' : s.wcJoin ? 'wc' : ''}">${s.final ? '🏆 Grand Final · ' + s.entering + ' teams' + (s.sizes.length > 1 ? ' (' + s.sizes.length + ' groups)' : '') + ' · MT ' + s.matches : `${s.name}: ${s.entering}${s.wcJoin ? ' (incl. ' + s.wcJoin + ' WC)' : ''} → ${s.sizes.length} groups · MT ${s.matches} → ${qualText(s.topN, s.extra)} → ${s.advancing}`}</span>`).join('<span style="border:0;background:none">→</span>')}</div>`;
 }
 function viewBracket() {
-  const n = S.stages.length ? S.stages[0].entering : approvedSlotCount() || S.settings.slots;
-  const p = E.planStages(n, S.stages.length ? wcTeams().length : S.settings.wildCards, planOpts());
-  return `<h1>Stages</h1><p class="sub">Calculated from ${n} teams and ${S.settings.wildCards} Wild Cards with the fixed logic: groups of 12, Top 8 in Stage 1, Top 6 after, Wild Cards join the first stage with 60 teams or fewer, Grand Final always 12.</p>
+  const p = plan(), wcAt = p.find(s => s.wcJoin);
+  return `<h1>Stages</h1><p class="sub">Set by the organiser: ${pathText()} teams. Every group has exactly 12 teams; each group's top teams go through until the next stage is full${wcAt ? `, and ${wcAt.wcJoin} Wild Cards join ${wcAt.name}` : ''}. The Grand Final always has 12.</p>
   ${planLine(p)}
   <div class="tw" style="margin-top:16px"><table><thead><tr><th>Stage</th><th>Teams</th><th>Groups</th><th>Group sizes</th><th>Qualify</th><th>Next</th><th>Status</th></tr></thead><tbody>
-  ${p.map((s, i) => `<tr><td>${s.name}</td><td>${s.entering}${s.wcJoin ? ' <span class="badge b-wc">+' + s.wcJoin + ' WC</span>' : ''}</td><td>${s.sizes.length}</td><td>${Math.min(...s.sizes)}–${Math.max(...s.sizes)}</td><td>${s.final ? 'Final ranking' : 'Top ' + s.topN + ' / group'}</td><td>${s.final ? '🏆' : s.advancing}</td><td>${S.stages[i] ? '<span class="badge ' + (S.stages[i].status === 'done' ? 'b-ok' : 'b-acc') + '">' + S.stages[i].status + '</span>' : '<span class="badge">planned</span>'}</td></tr>`).join('')}
+  ${p.map((s, i) => `<tr><td>${s.name}</td><td>${s.entering}${s.wcJoin ? ' <span class="badge b-wc">+' + s.wcJoin + ' WC</span>' : ''}</td><td>${s.sizes.length}</td><td>${Math.min(...s.sizes)}–${Math.max(...s.sizes)}</td><td>${s.final ? 'Final ranking' : qualText(s.topN, s.extra) + ' / group'}</td><td>${s.final ? '🏆' : s.advancing}</td><td>${S.stages[i] ? '<span class="badge ' + (S.stages[i].status === 'done' ? 'b-ok' : 'b-acc') + '">' + S.stages[i].status + '</span>' : '<span class="badge">planned</span>'}</td></tr>`).join('')}
   </tbody></table></div>`;
 }
 function viewInfo() {
@@ -1014,6 +1119,7 @@ const ICONS = {
   'admin/stages': 'M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 3h6v3h-6z',
   room: 'M4 6h16v10H4zm-2 12h20v2H2z',
   'admin/results': 'M5 3h14v18l-7-3-7 3zm3 5h8v2H8zm0 4h6v2H8z',
+  'admin/ocr': 'M4 5h3l2-2h6l2 2h3v14H4zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z',
   'admin/whatsapp': 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .3-3.4-.7a11.6 11.6 0 0 1-4.5-4c-.3-.5-1.1-1.5-1.1-2.8s.7-2 1-2.3a1 1 0 0 1 .7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .6l-.4.6-.4.5c-.1.1-.3.3-.1.6a8.6 8.6 0 0 0 1.6 2 7.9 7.9 0 0 0 2.3 1.4c.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3a2.4 2.4 0 0 1-.2 1.6z',
   'admin/complaints': 'M12 2 1 21h22zm1 15h-2v-2h2zm0-4h-2V9h2z',
   'admin/settings': 'M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.3 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.3-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 3.5-3.5 3.5 3.5 0 0 1-3.5 3.5z',
@@ -1027,8 +1133,8 @@ function adminCounts() {
 }
 function adminShell(route, body) {
   const c = adminCounts();
-  const nav = [['Manage', [['admin', 'Dashboard'], ['admin/teams', 'Teams', c.pending], ['admin/wildcards', 'Wild Cards'], ['admin/stages', 'Stages & groups']]],
-    ['Match day', [['room', 'Room panel'], ['admin/results', 'Results', c.results], ['admin/whatsapp', 'WhatsApp', c.wa], ['admin/complaints', 'Complaints', c.complaints]]],
+  const nav = [['Manage', [['admin', 'Dashboard'], ['admin/teams', 'Teams', c.pending], ...(wcOn() || S.teams.some(t => t.entry === 'WC') ? [['admin/wildcards', 'Wild Cards']] : []), ['admin/stages', 'Stages & groups']]],
+    ['Match day', [['room', 'Room panel'], ['admin/results', 'Results', c.results], ['admin/ocr', 'Upload screenshots'], ['admin/whatsapp', 'WhatsApp', c.wa], ['admin/complaints', 'Complaints', c.complaints]]],
     ['System', [['admin/settings', 'Settings'], ['admin/log', 'Activity log']]]];
   const [label, cls] = tourStatus();
   return `<div class="admin">
@@ -1082,12 +1188,13 @@ function viewAdmin() {
       <div class="row between small muted" style="margin-top:10px"><span>Form ${S.settings.regOpen && !S.stages.length ? 'open' : 'closed'} · closes ${fmtDate(S.settings.regCloses)}</span><a href="#/admin/teams">All teams →</a></div>
     </div>
     <div class="card"><div class="row between"><h3>${st && st.status === 'published' ? 'Match timeline' : 'Matches'}</h3>${ms.length ? `<span class="small muted">${done}/${ms.length} approved</span>` : ''}</div>
-      ${timeline.length ? timeline.map(({ g, m }) => `<a class="tl" href="#/room?m=${m.id}"><span class="tl-t">${matchDate(st, m)} · ${m.time}</span><span class="tl-n">${st.final ? 'Final' : 'Group ' + GL(g.label)} · M${m.no} <span class="muted small">${esc(m.map)}</span></span>${matchBadge(m)}</a>`).join('') : `<p class="muted small">${st && st.status === 'published' ? 'All matches have results.' : 'Matches appear here after a stage is published.'}</p>`}
+      ${timeline.length ? timeline.map(({ g, m }) => `<a class="tl" href="#/room?m=${m.id}"><span class="tl-t">${matchDate(st, m)} · ${m.time}</span><span class="tl-n">${gName(st, g, 1)} · M${m.no} <span class="muted small">${esc(m.map)}</span></span>${matchBadge(m)}</a>`).join('') : `<p class="muted small">${st && st.status === 'published' ? 'All matches have results.' : 'Matches appear here after a stage is published.'}</p>`}
     </div>
     <div class="card"><h3>Stage groups</h3>
       ${st && st.status !== 'draft' ? `<div class="gprog">${st.groups.map(g => { const d = g.matches.filter(m => m.resultStatus === 'approved').length; return `<div title="Group ${GL(g.label)}: ${d}/${g.matches.length}"><span>${st.final ? 'F' : GL(g.label)}</span><i style="height:${d / g.matches.length * 100}%"></i></div>`; }).join('')}</div><p class="small muted">Each bar = matches with approved results in that group.</p>` : '<p class="muted small">No published stage yet.</p>'}
     </div>
   </div>
+  ${dashResults()}
   <div class="dgrid two">
     <div class="card"><h3>Stage plan</h3>${planLine(p)}</div>
     <div class="card"><div class="row between"><h3>Recent activity</h3><a class="small" href="#/admin/log">All →</a></div>
@@ -1105,14 +1212,90 @@ function nextAdminStep() {
   if (st.final) return 'Tournament finished 🏆 See the <a href="#/leaderboard">leaderboard</a>.';
   return 'Generate the next stage in <a href="#/admin/stages">Stages & groups</a>.';
 }
+// Leading path entries that can't change any more: that stage already has its teams placed (it exists),
+// or the stage before it has finished (its qualifiers are approved). A running stage's next count stays editable.
+function lockedPathCount() {
+  let k = 0;
+  while (S.stages[k + 1] || (S.stages[k] && S.stages[k].status === 'done')) k++;
+  return k;
+}
+// The stage editor in Settings. Everything is the admin's choice: Stage 1 (= Total slots), the number of stages,
+// each stage's team count and the Grand Final's size. Groups (count ÷ 12) and qualifiers are worked out from the counts.
+function pathEditor(slots, wc, path, wcStage, wcCount, mts, names) {
+  const locked = lockedPathCount(), n = path.length;
+  names = names && names.length === n + 1 ? names : remapNames(names || stageNames(), n + 1);
+  const name = i => names[i] || E.defaultStageName(i, n + 1);
+  const nameInput = i => `<input name="sname" data-act="sname" data-i="${i}" maxlength="24" value="${esc(names[i])}" placeholder="${E.defaultStageName(i, n + 1)}" aria-label="Name of stage ${i + 1}" title="Stage name (letters, numbers, spaces)">`;
+  mts = mts && mts.length === n + 1 ? mts : remapMts(mts || stageMatches(), n + 1);
+  // Matches per group for each stage; fixed once that stage is published (its matches exist).
+  const mtLock = i => S.stages[i] && S.stages[i].status !== 'draft';
+  const mtInput = i => `<input name="mt" data-i="${i}" type="number" min="1" max="30" value="${mts[i]}" ${mtLock(i) ? 'disabled title="Locked: this stage\'s matches are already scheduled"' : ''} aria-label="${name(i)}: matches per group">`;
+  const p = E.planPath(slots, wc, path, wcStage), started = S.stages.length > 0;
+  const groupsOf = c => (Number(c) % E.GROUP_SIZE === 0 && c >= E.GROUP_SIZE) ? `${c / E.GROUP_SIZE} group${c / E.GROUP_SIZE > 1 ? 's' : ''}` : '<span style="color:var(--ff-red)">not a multiple of 12</span>';
+  const why = k => { const st = S.stages[k + 1]; return !st ? 'the stage before has finished' : st.status === 'draft' ? 'teams already placed' : st.status === 'done' ? 'already played' : 'this stage has started'; };
+  const rows = path.map((c, k) => {
+    const i = k + 1, prev = p[k], final = k === n - 1, lock = k < locked, joining = wc && wcStage === i ? wc : 0;
+    const before = k ? Number(path[k - 1]) : Number(slots), q = Number(c) - joining, groups = Math.ceil(before / E.GROUP_SIZE);
+    const bad = Number(c) % E.GROUP_SIZE || c < E.GROUP_SIZE ? '' : q >= before ? `must be fewer than the ${before} teams in ${name(k)}${joining ? ` (${joining} of them are Wild Cards)` : ''}`
+      : q < groups ? `too few: ${name(k)} has ${groups} groups, so at least ${groups + joining} teams` : '';
+    const from = bad ? `<span style="color:var(--ff-red)">${bad}</span>` : prev && prev.advancing > 0 && !(Number(c) % E.GROUP_SIZE) ? `${prev.advancing} from ${name(k)} (${qualText(prev.topN, prev.extra)} of ${prev.sizes.length} groups)${joining ? ` + ${joining} Wild Cards` : ''}` : '';
+    const input = `<input name="path" data-act="path" data-k="${k}" type="number" min="12" step="12" value="${c}" ${lock ? `disabled title="Locked: ${why(k)}"` : ''} aria-label="${name(i)} teams">`;
+    const note = final ? `${groupsOf(c)} · the champion is decided here${Number(c) > E.GROUP_SIZE ? ' (best total points across the groups)' : ''}` : groupsOf(c);
+    return `<div class="path-row${final ? ' final' : ''}"><div class="sn">${nameInput(i)}</div><div>${input}</div><div>${mtInput(i)}</div>
+      ${!final && !lock ? `<button type="button" class="btn ghost small" data-act="pathDel" data-k="${k}" title="Remove this stage" aria-label="Remove ${name(i)}">✕</button>` : '<i></i>'}
+      <span class="small muted">${lock ? `<b style="color:var(--ink)">Locked: ${why(k)}.</b> ` : ''}${note}${from ? ' · ' + from : ''}</span></div>`;
+  }).join('');
+  const wcOpts = path.map((_, k) => `<option value="${k + 1}" ${wcStage === k + 1 ? 'selected' : ''} ${k + 1 < S.stages.length ? 'disabled' : ''}>${name(k + 1)}</option>`).join('');
+  return `<div class="pf" style="margin-top:10px"><div><label>Number of stages (incl. Grand Final)</label><input name="stageCount" data-act="pathCount" type="number" min="2" max="21" value="${n + 1}"></div>
+      <div><label>Teams per group</label><input value="12 (fixed)" disabled title="Every group always has exactly 12 teams"></div></div>
+    <div class="path"><div class="path-row path-head"><em>Stage name</em><em>Teams</em><em title="Matches each group plays in this stage">Matches</em><em></em></div><div class="path-row"><div class="sn">${nameInput(0)}</div><div><input name="slots" data-act="pathBase" type="number" min="24" max="4992" step="12" value="${slots}" ${started ? 'disabled title="Locked: Stage 1 has started"' : ''} aria-label="Stage 1 teams (total slots)"></div><div>${mtInput(0)}</div><i></i>
+      <span class="small muted">${started ? '<b style="color:var(--ink)">Locked: Stage 1 has started.</b> ' : ''}${groupsOf(slots)} · this is the Total slots teams register for</span></div>${rows}</div>
+    ${locked < n - 1 ? '<div class="row" style="margin-top:8px"><button type="button" class="btn ghost small" data-act="pathAdd">+ Add a stage before the Grand Final</button></div>' : ''}
+    ${wcBlock(wc, wcStage, wcOpts, wcCount)}`;
+}
+// Wild Cards are optional. On: how many (a multiple of 12, counted in team places) and the stage they join. Off: only registered teams play.
+// They can be changed until the Wild Cards have joined a stage.
+function wcBlock(wc, wcStage, wcOpts, wcCount) {
+  const lock = wcJoined(), count = wc || Math.floor(Number(wcCount)) || E.GROUP_SIZE, bad = !lock && wc % E.GROUP_SIZE;
+  return `<div class="wc-opt"><label class="check" style="color:var(--ink)"><input type="checkbox" name="wcOn" data-act="pathWcOn" ${wc ? 'checked' : ''} ${lock ? 'disabled' : ''}> Wild Card teams in this tournament</label>
+    ${wc ? `<div class="pf"><div><label>How many Wild Card teams (multiple of 12)</label><input name="wildCards" data-act="pathBase" type="number" min="12" step="12" value="${count}" ${lock ? 'disabled' : ''}></div>
+      <div><label>They join at</label><select name="wcStage" data-act="pathWc" ${lock ? 'disabled' : ''}>${wcOpts}</select></div></div>
+      <p class="small muted" style="margin:4px 0 0">${lock ? 'Locked: the Wild Cards have already joined.' : bad ? `<span style="color:var(--ff-red)">${wc} is not a multiple of 12. Use 12, 24, 36 …</span>` : `${wc} Wild Card teams = ${wc / E.GROUP_SIZE} group${wc > E.GROUP_SIZE ? 's' : ''} worth of places in the stage they join. Invite them on the Wild Cards page.`}</p>`
+    : `<input type="hidden" name="wildCards" value="${count}"><p class="small muted" style="margin:4px 0 0">No Wild Cards: only the registered teams play. Tick the box to invite teams straight into a later stage.</p>`}</div>`;
+}
+const fixWc = (wc, path, ws, slots = S.settings.slots) => !wc ? 0 : ws >= 1 && ws <= path.length ? ws : E.defaultWcStage(path, wc, slots);
+// After the admin changes one count: keep the counts before it and the Grand Final, keep later counts that still fit,
+// and spread the rest evenly so the number of stages stays the same.
+function tidyPath(slots, wc, path, wcStage, from) {
+  path = path.map(Number);
+  const fin = path[path.length - 1], last = path.length - 1;
+  if (from >= last) return { path, wcStage: fixWc(wc, path, wcStage, slots) };   // the final changed: nothing comes after it
+  const keep = path.slice(0, Math.max(0, from + 1));
+  for (let j = keep.length; j < last; j++) {
+    const c = path[j], prev = keep.length ? keep[keep.length - 1] : slots;
+    if (c % E.GROUP_SIZE || c < E.GROUP_SIZE || c >= prev || c <= fin) break;
+    keep.push(c);
+  }
+  const out = keep.length === last ? [...keep, fin] : E.spreadPath(slots, path.length + 1, fin, keep) || [...keep, ...path.slice(keep.length)];
+  return { path: out, wcStage: fixWc(wc, out, wcStage, slots) };
+}
+// Re-draw the editor from what is typed in the form (after a count, the slots, the Wild Cards, the number of stages or the format changes).
+function refreshPathEd(form, change) {
+  const slots = Math.floor(Number(form.elements.slots.value)) || S.settings.slots;
+  const count = Math.floor(Number(form.elements.wildCards?.value)) || E.GROUP_SIZE;
+  const wc = form.elements.wcOn?.checked ? count : 0;
+  let path = [...form.querySelectorAll('[name=path]')].map(i => Number(i.value)), wcStage = Number(form.elements.wcStage?.value) || 0;
+  const mts = [...form.querySelectorAll('[name=mt]')].map(i => Math.floor(Number(i.value)) || E.MATCHES);
+  const names = [...form.querySelectorAll('[name=sname]')].map(i => E.cleanStageName(i.value));
+  const res = change(slots, wc, path, wcStage, mts, names); if (!res) return;
+  form.querySelector('#pathEd').innerHTML = pathEditor(slots, wc, res.path, res.wcStage, count, res.mts || remapMts(mts, res.path.length + 1), res.names || remapNames(names, res.path.length + 1));
+}
 function viewSettings() {
   const s = S.settings;
-  const p = E.planStages(S.stages.length ? S.stages[0].entering : (approvedSlotCount() || s.slots), s.wildCards, planOpts());
+  const probs = formatProblems();
   return `${adminTabs('admin/settings')}<h1>Settings</h1>
   <div class="grid g2"><div class="card"><form data-form="settings">
     <label>Tournament name</label><input name="name" value="${esc(s.name)}">
-    <label>Total slots</label><input name="slots" type="number" min="24" max="5000" value="${s.slots}" ${S.stages.length ? 'disabled' : ''}>
-    <label>Wild Card teams (0–12)</label><input name="wildCards" type="number" min="0" max="12" value="${s.wildCards}" ${S.stages.length ? 'disabled' : ''}>
     <label>Prize pool (shown on the site)</label><input name="prize" value="${esc(s.prize || '')}" placeholder="₹50,000">
     <label>Organiser</label><input name="organiser" value="${esc(s.organiser || '')}">
     <label>Tournament starts</label><input name="startDate" type="date" value="${esc(s.startDate || '')}">
@@ -1126,20 +1309,19 @@ function viewSettings() {
       <div><input type="file" accept="image/png,image/jpeg,image/webp" data-act="tlogo" aria-label="Upload tournament logo"><p class="small muted" style="margin:4px 0 0">PNG, JPG or WEBP. Shown in the header, the hero and the admin panel.${logoOk() ? ' <a href="#" data-act="tlogoRemove">Remove logo</a>' : ''}</p></div></div>
     <h3 style="margin-top:20px">Format</h3>
     <label>Bracket format</label>${formatSelect(s, 'preset')}
-    <div class="pf"><div><label>Stage 1: teams that qualify per group</label><input name="stage1Top" type="number" min="1" max="11" value="${Number(s.stage1Top) || 8}"></div>
-      <div><label>Later stages: qualify per group</label><input name="laterTop" type="number" min="1" max="11" value="${Number(s.laterTop) || 6}"></div>
-      <div><label>Matches per group (MT)</label><input name="matchesPerStage" type="number" min="1" max="30" value="${Number(s.matchesPerStage) || 6}"></div>
-      <div><label>Grand Final matches (MT)</label><input name="finalMatches" type="number" min="1" max="30" value="${Number(s.finalMatches) || 12}"></div>
-      <div><label>Grand Final mode</label><select name="finalMode"><option value="normal" ${s.finalMode !== 'rush' ? 'selected' : ''}>Normal: most points wins</option><option value="rush" ${s.finalMode === 'rush' ? 'selected' : ''}>Champion Rush</option></select></div>
+    <p class="small muted" style="margin:4px 0 0">Every group has exactly <b style="color:var(--ink)">12 teams</b>. Choose how many stages you want and how many teams play each one, the Grand Final included (multiples of 12). Stage 1 is the number of slots teams register for. The groups and who qualifies follow from the counts.</p>
+    <div id="pathEd">${pathEditor(s.slots, Number(s.wildCards) || 0, bracket().path, bracket().wcStage, s.wcLast, stageMatches(), stageNames())}</div>
+    <div class="pf"><div><label>Grand Final mode</label><select name="finalMode"><option value="normal" ${s.finalMode !== 'rush' ? 'selected' : ''}>Normal: most points wins</option><option value="rush" ${s.finalMode === 'rush' ? 'selected' : ''}>Champion Rush</option></select></div>
       <div><label>Champion Rush points target</label><input name="rushTarget" type="number" min="1" max="999" value="${Number(s.rushTarget) || 80}"></div></div>
     <p class="small muted">These apply to stages generated from now on. A stage still in draft can be changed on the Stages page.</p>
+    ${probs.length ? `<div class="notice" style="border-color:var(--ff-red)"><b>The stage team counts need fixing.</b> ${esc(probs[0])}.</div>` : ''}
     <h3 style="margin-top:20px">Rules page</h3>
     <label>Match day rules (one per line)</label><textarea name="rulesMatch" rows="5">${esc((s.rulesMatch?.length ? s.rulesMatch : RULES_MATCH).join('\n'))}</textarea>
     <label>Fair play rules (one per line)</label><textarea name="rulesFair" rows="4">${esc((s.rulesFair?.length ? s.rulesFair : RULES_FAIR).join('\n'))}</textarea>
+    <div id="setErr" role="alert"></div>
     <div class="row" style="margin-top:12px"><button class="btn">Save settings</button></div>
-    ${S.stages.length ? '<p class="small muted">Slots and Wild Cards are locked once Stage 1 is generated.</p>' : ''}
   </form></div>
-  <div class="card"><h3>Demo data</h3><div class="row"><button class="btn ghost" data-act="sample">Load sample data (252 + 6 WC)</button><button class="btn red" data-act="reset">Reset everything</button></div>
+  <div class="card"><h3>Demo data</h3><div class="row"><button class="btn ghost" data-act="sample">Load sample data (252 + 12 WC)</button><button class="btn red" data-act="reset">Reset everything</button></div>
     <p class="small muted">Sample data replaces everything in this browser.</p></div></div>`;
 }
 let teamFilter = { q: '', status: 'all' }, emailLogRows = null;
@@ -1171,6 +1353,18 @@ function passwordCard(t) {
       <p class="small muted">6–40 characters, no spaces. Saving signs the team out on every device. Every change goes in the Activity log.</p>
     </form></div>`;
 }
+// The same In Game Name (or a look-alike, e.g. KUTTY and ᴋᴜᴛᴛʏ) registered in more than one team. Allowed (they can
+// be different people), but the admin should know: on screenshots such a name is matched by its teammates.
+let sameNameOpen = false;
+function sameNameCard() {
+  const teams = S.teams.filter(t => t.status !== 'rejected' && t.status !== 'withdrawn').map(t => ({ id: t.id, name: t.name, players: t.players.map(p => ({ uid: p.uid, name: p.name })) }));
+  const groups = E.sameNames(teams);
+  if (!groups.length) return '';
+  const rows = groups.slice(0, sameNameOpen ? 200 : 6).map(list => `<tr><td><b>${esc(list[0].name)}</b></td><td class="small">${list.map(x => `${esc(x.name)} · <a href="#/admin/team/${x.teamId}">${esc(x.teamName)}</a> <span class="muted">UID ${esc(x.uid)}</span>`).join('<br>')}</td></tr>`).join('');
+  return `<div class="card" style="margin-bottom:12px"><div class="row between"><h3>Same name in different teams · ${groups.length}</h3>${groups.length > 6 ? `<button class="btn ghost small" data-act="sameNameToggle">${sameNameOpen ? 'Show fewer' : 'Show all'}</button>` : ''}</div>
+    <p class="small muted">These In Game Names look the same in more than one team (special letters and decorations ignored). That's allowed, since they can be different players with different UIDs. On screenshots, each is matched to the right team by the teammates next to it; if a rank shows only that one player, the admin is asked to check.</p>
+    <div class="tw"><table><thead><tr><th>Name</th><th>Registered as</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
 function viewTeams() {
   const q = teamFilter.q.toLowerCase();
   const list = slotTeams().filter(t => (teamFilter.status === 'all' || t.status === teamFilter.status) &&
@@ -1190,6 +1384,7 @@ function viewTeams() {
     ${emailLogRows.map(l => `<tr><td class="small">${new Date(l.at).toLocaleString('en-IN')}</td><td class="small">${esc(l.to_email)}</td><td>${esc(l.kind)}</td><td class="small">${l.note ? esc(l.note) : l.status ? (l.status < 300 ? '✅ Accepted by Brevo' : '❌ ' + l.status) : '⏳ Sending'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No emails yet.</td></tr>'}</tbody></table></div></div>` : ''}
   ${Cloud.on && !emailReady() ? `<div class="notice" style="margin-bottom:12px"><b>Emails are off.</b> Login emails can't be sent until you add the sender email in <a href="#/admin/settings">Settings</a> (and the Brevo key in Supabase). Until then, set a password on the team's Edit page and share it with the captain yourself.</div>` : ''}
   <p class="sub">${usedSlots()}/${S.settings.slots} slots filled. CSV columns: Team name, then for each of 4 players: In Game Name, Mobile, Email, UID.</p>
+  ${sameNameCard()}
   <div class="row" style="margin-bottom:10px"><input placeholder="Search team, Team ID, UID or mobile" value="${esc(teamFilter.q)}" data-act="search" style="max-width:320px">
     <select data-act="filter" style="max-width:160px">${['all', 'pending', 'approved', 'waitlist', 'rejected'].map(s => `<option ${s === teamFilter.status ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
   <div class="tw"><table><thead><tr><th>Slot</th><th>Team ID</th><th>Team</th><th>Captain</th><th>Players (UID)</th><th>Status</th>${Cloud.on ? `<th>Login email</th><th>Password <button class="btn ghost small" data-act="togglePw" title="Show or hide passwords">${showPw ? 'Hide' : 'Show'}</button></th>` : ''}<th></th></tr></thead><tbody>
@@ -1202,6 +1397,8 @@ function viewTeams() {
 let wcErrors = [], wcDraft = null;
 function viewWildcards() {
   const list = S.teams.filter(t => t.entry === 'WC');
+  if (!wcOn() && !list.length) return `${adminTabs('admin/wildcards')}<h1>Wild Cards</h1><div class="card"><p><b>Wild Cards are off</b> for this tournament: only the registered teams play.</p>
+    <p class="small muted">To invite teams straight into a later stage, tick <b>Wild Card teams in this tournament</b> in <a href="#/admin/settings">Settings → Format</a>.</p></div>`;
   const d = wcDraft || { name: '', players: [{}, {}, {}, {}] };
   const active = list.filter(t => t.status !== 'rejected' && t.status !== 'withdrawn').length;
   const open = S.wcInvites.filter(i => i.status === 'open');
@@ -1301,30 +1498,31 @@ function viewStages() {
   const p = plan();
   let body = '';
   if (!st) {
-    const n = approvedSlotCount();
-    body = `<div class="card"><h3>Generate Stage 1</h3><p>${n} approved teams → ${E.distribute(n).length} groups of up to 12.${S.teams.some(t => t.entry === 'SLOT' && t.status === 'pending') ? ' <span class="badge b-warn">Some teams are still pending</span>' : ''}</p>
-      <div class="row"><button class="btn" data-act="gen1" data-mode="sequential" ${n < 24 ? 'disabled' : ''}>Generate in slot order</button><button class="btn ghost" data-act="gen1" data-mode="random" ${n < 24 ? 'disabled' : ''}>Generate random</button></div>
-      ${n < 24 ? '<p class="small muted">At least 24 approved teams are needed.</p>' : '<p class="small muted">This closes registration.</p>'}</div>`;
+    const why = stage1Blocked(), n = approvedSlotCount(), slots = S.settings.slots;
+    body = `<div class="card"><h3>Generate Stage 1</h3><p>${n} of ${slots} slots filled with approved teams → ${Math.floor(slots / E.GROUP_SIZE)} groups of 12.${S.teams.some(t => t.entry === 'SLOT' && t.status === 'pending') ? ' <span class="badge b-warn">Some teams are still pending</span>' : ''}</p>
+      <div class="row"><button class="btn" data-act="gen1" data-mode="sequential" ${why ? 'disabled' : ''}>Generate in slot order</button><button class="btn ghost" data-act="gen1" data-mode="random" ${why ? 'disabled' : ''}>Generate random</button></div>
+      <p class="small muted">${why ? esc(why) : 'This closes registration.'}</p></div>`;
   } else {
     const draft = st.status === 'draft';
-    const groupOpts = (cur) => st.groups.map((g, gi) => `<option value="${gi}" ${gi === cur ? 'selected' : ''} ${g.teamIds.length >= 12 && gi !== cur ? 'disabled' : ''}>${st.final ? 'Final' : 'Group ' + GL(g.label)} (${g.teamIds.length}/12)</option>`).join('');
+    const groupOpts = (cur) => st.groups.map((g, gi) => `<option value="${gi}" ${gi === cur ? 'selected' : ''} ${g.teamIds.length >= 12 && gi !== cur ? 'disabled' : ''}>${gName(st, g, 1)} (${g.teamIds.length}/12)</option>`).join('');
     const mt = st.matchCount || (st.final ? E.FINAL_MATCHES : E.MATCHES);
     const cfg = `<form data-form="stagecfg" class="stagecfg"><div><label>Start date</label><input type="date" name="startDate" value="${esc(stageStart(st))}"></div>
       <div><label>Matches per group (MT)</label><input type="number" name="matchCount" min="1" max="30" value="${mt}" ${draft ? '' : 'disabled'}></div>
-      ${st.final ? `<div><label>Final mode</label><input value="${rushOn() ? 'Champion Rush · ' + rushTarget() + ' pts' : 'Normal'}" disabled></div>` : `<div><label>Qualify per group</label><input type="number" name="topN" min="1" max="11" value="${st.topN}" ${draft ? '' : 'disabled'}></div>`}
-      <button class="btn ghost small">Save stage</button>${draft ? '' : '<span class="small muted">Matches and qualifiers lock once the stage is published.</span>'}</form>`;
+      ${st.final ? `<div><label>Final mode</label><input value="${rushOn() ? 'Champion Rush · ' + rushTarget() + ' pts' : 'Normal'}" disabled></div>` : `<div><label>Teams in ${esc(p[st.index + 1]?.name || 'the next stage')} (multiple of 12)</label><input type="number" name="toNext" min="12" step="12" value="${bracket().path[st.index] ?? ''}" ${st.status === 'done' ? 'disabled' : ''}>
+        <span class="small muted">Top ${st.topN} of each group${st.extra ? ` + ${st.extra} best ${ordinal(st.topN + 1)} place${st.extra > 1 ? 's' : ''}` : ''}${p[st.index + 1]?.wcJoin ? ` · incl. ${p[st.index + 1].wcJoin} Wild Cards` : ''}</span></div>`}
+      <button class="btn ghost small">Save stage</button>${draft ? '' : '<span class="small muted">Matches lock once the stage is published. The next stage team count can change until you approve the qualifiers.</span>'}</form>`;
     body = `<div class="card"><div class="row between"><h3>${st.name} · ${st.entering} teams · ${st.groups.length} group${st.groups.length > 1 ? 's' : ''} · MT ${mt} · <span class="badge b-acc">${st.status}</span></h3>
       <div class="row">${draft ? `<button class="btn green" data-act="publish" ${st.wcTray.length ? 'disabled' : ''}>Lock & publish</button>` : ''}
       ${st.status === 'published' && !allApproved(st) ? `<button class="btn ghost" data-act="simulate">Simulate all results</button>` : ''}
-      ${st.status === 'published' && allApproved(st) ? `<button class="btn green" data-act="qualify">${st.final ? 'Finish tournament' : 'Approve Top ' + st.topN + ' & close stage'}</button>` : ''}
+      ${st.status === 'published' && allApproved(st) ? `<button class="btn green" data-act="qualify">${st.final ? 'Finish tournament' : `Approve ${st.toNext ?? ''} qualifiers (${qualText(st.topN, st.extra)}) & close stage`}</button>` : ''}
       ${st.status === 'done' && !st.final ? `<button class="btn" data-act="genNext">Generate ${p[st.index + 1] ? p[st.index + 1].name : 'next stage'}</button>` : ''}</div></div>
       ${cfg}
-      ${draft ? '<p class="small muted">Draft: move teams between groups if needed. No group can go over 12. Publishing shows the groups and schedule to teams.</p>' : ''}
+      ${draft ? '<p class="small muted">Draft: every group must have exactly 12 teams before publishing. Publishing shows the groups and schedule to teams.</p>' : ''}
       ${st.wcTray.length ? `<div class="notice"><b>Place ${st.wcTray.length} Wild Card team${st.wcTray.length > 1 ? 's' : ''}</b> before publishing.
         <div class="tw" style="margin-top:8px"><table><tbody>${st.wcTray.map(id => `<tr><td>${tname(id)}</td><td><select data-act="placeWc" data-id="${id}"><option value="">Choose group…</option>${groupOpts(-1)}</select></td></tr>`).join('')}</tbody></table></div>
         <div class="row" style="margin-top:8px"><button class="btn small" data-act="autoWc">Auto place (spread evenly)</button></div></div>` : ''}
     </div>
-    <div class="grid g3" style="margin-top:12px">${st.groups.map((g, gi) => draft ? `<div class="groupcard"><h3>${st.final ? 'Final' : 'Group ' + GL(g.label)} <span class="muted small">${g.teamIds.length}/12</span></h3><ol>${g.teamIds.map(id => `<li class="row between" style="display:list-item"><span>${tname(id)}</span> <select class="small" style="width:auto;padding:2px 4px;font-size:11px" data-act="move" data-id="${id}" data-from="${gi}">${groupOpts(gi)}</select></li>`).join('')}</ol></div>` : standingsTable(st, g)).join('')}</div>`;
+    <div class="grid g3" style="margin-top:12px">${st.groups.map((g, gi) => draft ? `<div class="groupcard"><h3>${gName(st, g, 1)} <span class="muted small">${g.teamIds.length}/12</span></h3><ol>${g.teamIds.map(id => `<li class="row between" style="display:list-item"><span>${tname(id)}</span> <select class="small" style="width:auto;padding:2px 4px;font-size:11px" data-act="move" data-id="${id}" data-from="${gi}">${groupOpts(gi)}</select></li>`).join('')}</ol></div>` : standingsTable(st, g)).join('')}</div>`;
   }
   const fmtLocked = S.stages.length && !S.stages.some(x => x.status === 'draft') && S.stages[S.stages.length - 1].final;
   const fmtForm = fmtLocked ? '' : `<form class="card fmt-pick" data-form="format"><div><label>Bracket format</label>${formatSelect(S.settings, 'preset')}</div>
@@ -1342,7 +1540,7 @@ function viewMatchPoints(id) {
   if (!m.results) return `${adminTabs('admin/complaints')}<a class="small" href="${back}">← Back</a><h1>Match points</h1><p class="muted">This match has no results yet.</p>`;
   const order = g.teamIds.slice().sort((a, b) => { const ra = m.results[a], rb = m.results[b]; return (ra && !ra.noShow ? ra.place : 99) - (rb && !rb.noShow ? rb.place : 99); });
   return `${adminTabs('admin/complaints')}<a class="small" href="${back}">← Back</a>
-  <h1>${esc(st.name)} · ${st.final ? 'Grand Final' : 'Group ' + esc(GL(g.label))} · Match ${m.no}</h1>
+  <h1>${esc(st.name)} · ${esc(gName(st, g))} · Match ${m.no}</h1>
   <p class="sub">${esc(m.map)} · ${m.resultStatus === 'approved' ? 'Published' : m.resultStatus === 'submitted' ? 'Waiting for approval' : 'Not published'}. Change positions or kills, then save. Points, ranks, kills and Booyahs update everywhere.${st.status === 'done' ? ' This stage is closed, so who qualified does not change.' : ''}</p>
   ${c ? `<div class="card complaint open" style="margin-bottom:14px"><div class="cmp-shot">${c.shotData && /^data:image\/(png|jpeg|webp);base64,/.test(c.shotData) ? `<img src="${esc(c.shotData)}" alt="Screenshot" data-act="viewShot">` : '<div class="noshot">No screenshot</div>'}</div>
     <div class="cmp-body"><b>Complaint from ${tname(c.teamId)}</b><p>${esc(c.reason)}</p><span class="small muted">Saving asks for a reply to the team and marks the complaint as corrected.</span></div></div>` : ''}
@@ -1358,9 +1556,9 @@ function viewMatchPoints(id) {
 }
 function viewResults() {
   const items = S.stages.flatMap(st => st.groups.flatMap(g => g.matches.filter(m => m.resultStatus === 'submitted').map(m => ({ st, g, m }))));
-  return `${adminTabs('admin/results')}<h1>Results to approve</h1><p class="sub">Check against the screenshots, then approve. Approved results appear on the leaderboard.</p>
+  return `${adminTabs('admin/results')}<div class="row between"><div><h1>Results to approve</h1><p class="sub">Check against the screenshots, then approve. Approved results appear on the leaderboard.</p></div><a class="btn" href="#/admin/ocr">Upload screenshots</a></div>
   ${items.length ? `<div class="row" style="margin-bottom:10px"><button class="btn green small" data-act="approveAllResults">Approve all ${items.length}</button></div>` : '<p class="muted">Nothing waiting.</p>'}
-  <div class="grid g2">${items.map(({ st, g, m }) => `<div class="card"><h3>${st.name} · ${st.final ? 'Final' : 'Group ' + GL(g.label)} · Match ${m.no} · ${esc(m.map)}</h3>
+  <div class="grid g2">${items.map(({ st, g, m }) => `<div class="card"><h3>${st.name} · ${gName(st, g, 1)} · Match ${m.no} · ${esc(m.map)}</h3>
     <p class="small muted">Screenshots: ${m.screenshots.length ? m.screenshots.map(esc).join(', ') : 'none'}</p>
     <div class="tw"><table><thead><tr><th>Team</th><th>Pos</th><th>Kills</th><th>Pts</th></tr></thead><tbody>
     ${Object.entries(m.results).sort((a, b) => (a[1].noShow ? 99 : a[1].place) - (b[1].noShow ? 99 : b[1].place)).map(([id, r]) => `<tr><td>${tname(id)}</td><td>${r.noShow ? 'No-show' : r.place}</td><td>${r.noShow ? 0 : r.kills}</td><td>${r.noShow ? 0 : E.matchPoints(r.place, r.kills)}</td></tr>`).join('')}</tbody></table></div>
@@ -1382,7 +1580,7 @@ function viewWhatsapp() {
   ${!groups.length ? '<p class="muted">Publish a stage first.</p>' : `<p class="small muted">Create the WhatsApp group in the app, copy its invite link, paste it here and save. Each captain in that group gets the link.</p>
   <div class="grid g2">${groups.map(g => { const L = S.groupLinks[linkKey(st, g)] || {}; const iv = L.invites || {};
     const joined = g.teamIds.filter(id => iv[id] === 'joined').length;
-    return `<div class="card"><div class="row between"><h3>${st.final ? 'Grand Final' : 'Group ' + GL(g.label)}</h3><span class="small muted">${joined}/${g.teamIds.length} joined</span></div>
+    return `<div class="card"><div class="row between"><h3>${gName(st, g)}</h3><span class="small muted">${joined}/${g.teamIds.length} joined</span></div>
     <form data-form="walink" data-k="${esc(linkKey(st, g))}" class="row"><input name="link" placeholder="https://chat.whatsapp.com/…" value="${esc(L.link || '')}" style="flex:1;min-width:180px"><button class="btn small">${L.link ? 'Update' : 'Save'} link</button></form>
     ${L.link ? `<details style="margin-top:8px"><summary class="small">Captains (${g.teamIds.length})</summary><div class="tw" style="margin-top:6px"><table><tbody>${g.teamIds.map(id => `<tr><td>${tname(id)}</td><td>${invBadge(inv(g, id))}</td>
       <td class="row"><button class="btn small ghost" data-act="invite" data-k="${esc(linkKey(st, g))}" data-t="${id}" data-v="joined">Joined</button><button class="btn small ghost" data-act="invite" data-k="${esc(linkKey(st, g))}" data-t="${id}" data-v="failed">Failed</button></td></tr>`).join('')}</tbody></table></div></details>` : ''}</div>`; }).join('')}</div>`}
@@ -1428,9 +1626,9 @@ function viewRoom() {
   const editing = m.status === 'completed' && m.resultStatus === 'none';
   return `${tabs}<h1>Room panel</h1><p class="sub">${st.name} · ${queue.length} matches left</p>
   <div class="grid g3"><div class="card" style="max-height:540px;overflow:auto"><h3>Match queue</h3>
-    ${queue.slice(0, 80).map(x => `<a href="#/room?m=${x.m.id}" class="row between" style="text-decoration:none;padding:6px 8px;border-radius:8px;${x.m.id === m.id ? 'background:var(--panel2)' : ''}"><span>${st.final ? 'Final' : 'G' + GL(x.g.label)} · M${x.m.no} <span class="muted small">${matchDate(st, x.m)} ${x.m.time}</span></span>${matchBadge(x.m)}</a>`).join('')}
+    ${queue.slice(0, 80).map(x => `<a href="#/room?m=${x.m.id}" class="row between" style="text-decoration:none;padding:6px 8px;border-radius:8px;${x.m.id === m.id ? 'background:var(--panel2)' : ''}"><span>${st.final ? gName(st, x.g, 1) : 'G' + GL(x.g.label)} · M${x.m.no} <span class="muted small">${matchDate(st, x.m)} ${x.m.time}</span></span>${matchBadge(x.m)}</a>`).join('')}
   </div>
-  <div class="card" style="grid-column:span 2"><div class="row between"><h3>${st.final ? 'Grand Final' : 'Group ' + GL(g.label)} · Match ${m.no} · ${esc(m.map)} · ${matchDate(st, m)}, ${m.time}</h3>${matchBadge(m)}</div>
+  <div class="card" style="grid-column:span 2"><div class="row between"><h3>${gName(st, g)} · Match ${m.no} · ${esc(m.map)} · ${matchDate(st, m)}, ${m.time}</h3>${matchBadge(m)}</div>
     ${roomErr ? `<div class="errors">${esc(roomErr)}</div>` : ''}
     <div class="row" style="margin:6px 0 12px">
       ${m.status === 'scheduled' ? `<button class="btn" data-act="mstatus" data-m="${m.id}" data-s="checkin">Open check-in</button>` : ''}
@@ -1468,27 +1666,27 @@ function render() {
   document.getElementById('modeNote').textContent = Cloud.on ? 'Live' : 'Offline demo (data saved in this browser)';
   if (Cloud.on) session.role = Cloud.role;
   document.querySelectorAll('.mainnav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#/' + r.split('/')[0]));
-  { const k = r.split('/')[0] || (S.stages.length ? 'overview' : ''); document.querySelectorAll('.rail a').forEach(a => a.classList.toggle('on', a.dataset.r === k));
-    const reg = document.querySelector('.rail-reg'); if (reg) reg.hidden = !!S.stages.length;
-    const names = { '': 'Register', overview: 'Overview', groups: 'Group Stage', schedule: 'Matches', leaderboard: 'Standings', bracket: 'Bracket', info: 'Rules', 'my-team': 'My Team', staff: 'Staff login', registered: 'Registered', wildcard: 'Wild Card invite', match: 'Match result', room: 'Room panel' };
+  { const k = r.split('/')[0] || 'overview'; document.querySelectorAll('.rail a').forEach(a => a.classList.toggle('on', a.dataset.r === k));
+    const reg = document.querySelector('.rail-reg'); if (reg) reg.hidden = !!S.stages.length || !S.settings.regOpen;
+    const names = { register: 'Register', overview: 'Overview', groups: 'Group Stage', schedule: 'Matches', leaderboard: 'Standings', bracket: 'Bracket', info: 'Rules', 'my-team': 'My Team', staff: 'Staff login', registered: 'Registered', wildcard: 'Wild Card invite', match: 'Match result', room: 'Room panel' };
     const tt = document.getElementById('topTitle'); if (tt) tt.textContent = k.startsWith('admin') || session.role === 'admin' && r.startsWith('admin') ? 'Admin' : (names[k] ?? 'Tournament'); }
   const staffOnly = r.startsWith('admin') || r === 'room';
   if (staffOnly && !session.role) { app.innerHTML = viewStaff(); return; }
   if (r.startsWith('admin') && session.role !== 'admin') { app.innerHTML = `<p>Admins only.</p>${viewStaff()}`; return; }
-  const views = { '': viewRegister, 'my-team': () => session.teamCode ? viewTeamDash() : viewMyTeamLogin(), groups: viewGroups, schedule: viewSchedule, leaderboard: viewLeaderboard,
+  const views = { register: viewRegister, 'my-team': () => session.teamCode ? viewTeamDash() : viewMyTeamLogin(), groups: viewGroups, schedule: viewSchedule, leaderboard: viewLeaderboard,
     bracket: viewBracket, info: viewInfo, staff: viewStaff, admin: viewAdmin, 'admin/settings': viewSettings, 'admin/teams': viewTeams, 'admin/wildcards': viewWildcards,
-    'admin/stages': viewStages, 'admin/results': viewResults, 'admin/complaints': viewComplaints, 'admin/log': viewLog, 'admin/whatsapp': viewWhatsapp, room: viewRoom };
+    'admin/stages': viewStages, 'admin/results': viewResults, 'admin/ocr': viewOcr, 'admin/complaints': viewComplaints, 'admin/log': viewLog, 'admin/whatsapp': viewWhatsapp, room: viewRoom };
   views.overview = viewOverview;
   views.bracket = viewBracketTeams;
-  const pub = ['', 'overview', 'groups', 'schedule', 'leaderboard', 'bracket', 'info'];
-  const key = r === '' && S.stages.length ? 'overview' : r;
+  const pub = ['', 'overview', 'register', 'groups', 'schedule', 'leaderboard', 'bracket', 'info'];
+  const key = r === '' ? 'overview' : r;   // the landing page: header + overview; the form opens from "Register now"
   if (r.startsWith('registered/')) app.innerHTML = viewRegistered(r.split('/')[1]);
   else if (r.startsWith('wildcard/')) app.innerHTML = viewWcInvite(r.split('/')[1]);
   else if (r.startsWith('match/')) app.innerHTML = hero('schedule') + viewMatchResult(decodeURIComponent(r.split('/')[1]));
   else if (r.startsWith('admin/team/')) app.innerHTML = adminShell('admin/teams', viewEditTeam(r.split('/')[2]));
   else if (r.startsWith('admin/match/')) app.innerHTML = adminShell('admin/complaints', viewMatchPoints(decodeURIComponent(r.split('/')[2])));
   else {
-    const html = (pub.includes(key) ? hero(key) : '') + `<div class="page-body">${(views[key] || viewRegister)()}</div>`;
+    const html = (pub.includes(key) ? hero(key) : '') + `<div class="page-body">${(views[key] || viewOverview)()}</div>`;
     const shell = session.role === 'admin' && (key.startsWith('admin') || key === 'room');
     app.innerHTML = shell ? adminShell(key, html) : html;
   }
@@ -1571,37 +1769,88 @@ document.addEventListener('submit', e => {
   }
   if (kind === 'stagecfg') {
     const st = curStage(); if (!st) return;
-    const d = String(fd.get('startDate') || ''); if (/^\d{4}-\d{2}-\d{2}$/.test(d)) st.startDate = d;
-    if (st.status === 'draft') {
-      const mc = Math.floor(Number(fd.get('matchCount'))); if (mc >= 1 && mc <= 30) st.matchCount = mc;
-      if (!st.final) { const tn = Math.floor(Number(fd.get('topN'))); if (tn >= 1 && tn <= 11) st.topN = tn; }
+    // A new team count for the next stage: the stages after it are re-worked, and nothing is saved if it doesn't give full groups of 12.
+    if (st.status !== 'done' && !st.final && fd.get('toNext') !== null) {
+      const v = Math.floor(Number(fd.get('toNext'))), b = bracket();
+      if (v !== b.path[st.index]) {
+        const path = b.path.slice(); path[st.index] = v;
+        const t = tidyPath(S.settings.slots, Number(S.settings.wildCards) || 0, path, b.wcStage, st.index);
+        const probs = formatProblems({ path: t.path, wcStage: t.wcStage });
+        if (probs.length) { toast(`Not saved: ${probs[0]}`); render(); return; }
+        S.settings.path = t.path; S.settings.wcStage = t.wcStage; syncTargets();
+        log('Stage team counts changed', pathText());
+      }
     }
-    log('Stage settings changed', `${st.name}: starts ${st.startDate || '-'}, MT ${st.matchCount || '-'}${st.final ? '' : ', Top ' + st.topN}`); save(); toast('Stage saved'); render(); return;
+    const d = String(fd.get('startDate') || ''); if (/^\d{4}-\d{2}-\d{2}$/.test(d)) st.startDate = d;
+    if (st.status === 'draft') { const mc = Math.floor(Number(fd.get('matchCount')));
+      if (mc >= 1 && mc <= 30) { st.matchCount = mc; const m = stageMatches(); m[st.index] = mc; S.settings.stageMatches = m; } }   // keep Settings in step
+    log('Stage settings changed', `${st.name}: starts ${st.startDate || '-'}, MT ${st.matchCount || '-'}${st.final ? '' : ', ' + (st.toNext ?? '-') + ' go through'}`); save(); toast('Stage saved'); render(); return;
   }
   if (kind === 'format') {
     const f = FORMATS[fd.get('preset')];
-    if (f) { FORMAT_KEYS.forEach(k => { S.settings[k] = f[k]; }); log('Bracket format changed', f.label); save(); toast('Format generated'); }
-    else toast('Custom format: set the numbers in Settings');
+    if (f) {
+      // Fill the stage team counts from this format; stages that already exist keep theirs.
+      const s = S.settings, wc = Number(s.wildCards) || 0, keep = bracket().path.slice(0, lockedPathCount());
+      const t = keep.length ? E.suggestPath(s.slots, wc, f.stage1Top, f.laterTop, { path: keep, wcStage: bracket().wcStage }) : E.suggestPath(s.slots, wc, f.stage1Top, f.laterTop);
+      const probs = formatProblems({ path: t.path, wcStage: t.wcStage });
+      if (probs.length) { toast(`Not changed: ${probs[0]}. Set the team counts in Settings.`); return; }
+      const old = stageMatches(), n = t.path.length + 1, fixed = i => S.stages[i] && S.stages[i].status !== 'draft';
+      FORMAT_KEYS.forEach(k => { s[k] = f[k]; }); s.path = t.path; s.wcStage = t.wcStage;
+      s.stageMatches = Array.from({ length: n }, (_, i) => fixed(i) ? S.stages[i].matchCount || old[i] : i === n - 1 ? f.finalMatches : f.matchesPerStage);
+      S.stages.forEach(st => { if (st.status === 'draft') st.matchCount = s.stageMatches[st.index]; }); syncTargets();
+      log('Bracket format changed', f.label + ': ' + pathText()); save(); toast('Format generated');
+    }
+    else toast('Custom format: set the team counts in Settings');
     render(); return;
   }
   if (kind === 'settings') {
-    const s = S.settings; s.name = String(fd.get('name') || 'Squad Cup').trim(); s.regCloses = String(fd.get('regCloses')); s.prize = String(fd.get('prize') || '').trim(); s.organiser = String(fd.get('organiser') || '').trim(); s.startDate = String(fd.get('startDate') || '');
+    // Check the bracket first: slots a multiple of 12, and every stage's team count a multiple of 12 ending with a Grand Final of 12.
+    // Nothing is saved if it doesn't work. (Locked counts are disabled inputs, so read them from the form, not FormData.)
+    const slots = S.stages.length ? S.settings.slots : Number(fd.get('slots'));
+    // Wild Cards: on (a multiple of 12) or off (0). Locked once they have joined a stage.
+    const wcCount = Math.max(0, Math.min(4992, Math.floor(Number(fd.get('wildCards'))) || E.GROUP_SIZE));   // checked below: a multiple of 12
+    const wc = wcJoined() ? Number(S.settings.wildCards) || 0 : fd.get('wcOn') ? wcCount : 0;
+    const lockedN = lockedPathCount(), oldPath = bracket().path;   // stages that exist or are running keep their real counts
+    const newPath = [...f.querySelectorAll('[name=path]')].map((i, k) => k < lockedN ? (S.stages[k + 1]?.entering ?? oldPath[k]) : Number(i.value));
+    const newWc = wc ? (fd.get('wcStage') !== null ? Number(fd.get('wcStage')) || 0 : bracket().wcStage) : 0;
+    // Stage names: '' means the default; what's shown = the name or the default.
+    const newNames = [...f.querySelectorAll('[name=sname]')].map(i => E.cleanStageName(i.value));
+    const shownNames = newNames.map((x, i) => x || E.defaultStageName(i, newNames.length));
+    {
+      const showErr = html => { const box = document.getElementById('setErr'); if (box) { box.innerHTML = `<div class="notice" style="border-color:var(--ff-red);margin-top:12px">${html}</div>`; box.scrollIntoView({ block: 'center' }); } toast('Not saved: see the message above Save'); };
+      if (!S.stages.length && !E.slotsOk(slots)) { showErr(`<b>Total slots must be a multiple of 12</b> (24, 36, 48 … 240, 252 …), so every group has exactly 12 teams. ${esc(String(fd.get('slots')))} is not.`); return; }
+      const dup = shownNames.find((x, i) => shownNames.findIndex(y => y.toLowerCase() === x.toLowerCase()) !== i);
+      if (dup) { showErr(`<b>Two stages are called "${esc(dup)}".</b> Give every stage a different name.`); return; }
+      const probs = formatProblems({ slots, wildCards: wc, path: newPath, wcStage: newWc, stageNames: newNames });
+      if (probs.length) { showErr(`<b>The stage team counts need fixing.</b> ${esc(probs[0])}.`); return; }
+      const wcHave = S.teams.filter(t => t.entry === 'WC' && (t.status === 'approved' || t.status === 'pending')).length;
+      if (!wcJoined() && wcHave > wc) { showErr(`<b>${wcHave} Wild Card team${wcHave > 1 ? 's are' : ' is'} already registered.</b> ${wc ? `Allow at least ${wcHave}` : 'Keep Wild Cards on'}, or remove ${wcHave > 1 ? 'them' : 'it'} on the <a href="#/admin/wildcards">Wild Cards page</a> first.`); return; }
+      if (fd.get('finalMode') === 'rush' && newPath[newPath.length - 1] > E.GROUP_SIZE) { showErr(`<b>Champion Rush needs a Grand Final of 12 teams</b> (one room). Your final has ${newPath[newPath.length - 1]}. Choose Normal mode or a 12-team final.`); return; }
+    }
+    const s = S.settings;
+    s.path = newPath; s.wcStage = newWc; s.wildCards = wc; s.wcLast = wcCount;
+    s.stageNames = newNames; S.stages.forEach(st => { if (shownNames[st.index]) st.name = shownNames[st.index]; });
+    { const f2 = FORMATS[fd.get('preset')]; if (f2) { s.stage1Top = f2.stage1Top; s.laterTop = f2.laterTop; } }   // remembered for filling new stages
+    s.name = String(fd.get('name') || 'Squad Cup').trim(); s.regCloses = String(fd.get('regCloses')); s.prize = String(fd.get('prize') || '').trim(); s.organiser = String(fd.get('organiser') || '').trim(); s.startDate = String(fd.get('startDate') || '');
     if (Cloud.on) { s.emailFrom = String(fd.get('emailFrom') || '').trim(); s.emailName = String(fd.get('emailName') || '').trim(); s.siteUrl = location.origin; }
     s.regOpen = !!fd.get('regOpen'); s.notifyPaused = !!fd.get('notifyPaused');
     { const num = (k, d, max) => { const v = Math.floor(Number(fd.get(k))); return v >= 1 && v <= max ? v : d; };
-      s.stage1Top = num('stage1Top', 8, 11); s.laterTop = num('laterTop', 6, 11); s.matchesPerStage = num('matchesPerStage', 6, 30); s.finalMatches = num('finalMatches', 12, 30);
+      // Matches per group for each stage (stages already published keep their real number; a draft stage takes the new one).
+      const mts = [...f.querySelectorAll('[name=mt]')].map((i, k) => S.stages[k] && S.stages[k].status !== 'draft' ? S.stages[k].matchCount : Math.max(1, Math.min(30, Math.floor(Number(i.value)) || E.MATCHES)));
+      s.stageMatches = mts; s.matchesPerStage = mts[mts.length > 1 ? mts.length - 2 : 0]; s.finalMatches = mts[mts.length - 1];
+      S.stages.forEach(st => { if (st.status === 'draft' && mts[st.index]) st.matchCount = mts[st.index]; });
       s.finalMode = fd.get('finalMode') === 'rush' ? 'rush' : 'normal'; s.rushTarget = num('rushTarget', 80, 999);
       const lines = k => String(fd.get(k) || '').split('\n').map(x => x.trim().slice(0, 200)).filter(Boolean).slice(0, 20);
       s.rulesMatch = lines('rulesMatch'); s.rulesFair = lines('rulesFair'); }
     if (!S.stages.length) {
-      s.slots = Math.max(24, Math.min(5000, Number(fd.get('slots')) || 252));
-      s.wildCards = Math.max(0, Math.min(12, Number(fd.get('wildCards')) || 0));
+      s.slots = Math.max(24, Math.min(4992, Number(fd.get('slots')) || 252));   // already checked: a multiple of 12
       // Lowering slots pushes the latest registrations to the waitlist; raising pulls waitlist in.
       const active = slotTeams().filter(t => t.status === 'pending' || t.status === 'approved').sort((a, b) => a.slotNo - b.slotNo);
       active.slice(s.slots).forEach(t => { t.status = 'waitlist'; t.slotNo = null; });
       promoteWaitlist();
     }
-    log('Settings saved', `slots ${s.slots}, wild cards ${s.wildCards}`); save(); toast('Saved'); render(); return;
+    syncTargets();
+    log('Settings saved', `slots ${s.slots}, wild cards ${wc ? wc : 'off'}, stages ${pathText()}`); save(); toast('Saved'); render(); return;
   }
   if (kind === 'wildcard') {
     const data = readTeamForm(f); wcDraft = data;
@@ -1678,7 +1927,7 @@ document.addEventListener('submit', e => {
     if (link && changed) g.teamIds.forEach(id => {
       S.notifications = S.notifications.filter(n => !(n.key === 'invite|' + id + '|' + k && n.status === 'queued'));
       const old = S.notifications.find(n => n.key === 'invite|' + id + '|' + k); if (old) old.key += '|old';
-      notify(id, 'invite', k, `${S.settings.name} · ${stg.name}: join your ${stg.final ? 'Grand Final' : 'Group ' + GL(g.label)} WhatsApp group: ${link}`);
+      notify(id, 'invite', k, `${S.settings.name} · ${stg.name}: join your ${gName(stg, g)} WhatsApp group: ${link}`);
       if (L.invites[id] !== 'joined') L.invites[id] = 'pending';
     });
     log('WhatsApp link saved', stg.name + ' ' + label); save(); toast('Link saved · invites queued'); render(); return;
@@ -1711,8 +1960,30 @@ document.addEventListener('change', e => {
   const el = e.target, act = el.dataset.act; if (!act) return;
   const st = curStage();
   if (act === 'filter') { teamFilter.status = el.value; render(); }
+  if (act === 'dashMatch') { location.hash = '#/admin?mr=' + encodeURIComponent(el.value); return; }
   if (act === 'preset') { const f = FORMATS[el.value], form = el.closest('form');
-    if (f && form && form.dataset.form === 'settings') FORMAT_KEYS.forEach(k => { const inp = form.elements[k]; if (inp) inp.value = f[k]; }); }
+    if (f && form && form.dataset.form === 'settings') {
+      if (form.elements.finalMode) form.elements.finalMode.value = f.finalMode;
+      // Fill the stage team counts and matches from this format (stages that already exist stay as they are).
+      refreshPathEd(form, (slots, wc, path, ws, mts) => { const keep = path.slice(0, lockedPathCount());
+        const t = keep.length ? E.suggestPath(slots, wc, f.stage1Top, f.laterTop, { path: keep, wcStage: ws }) : E.suggestPath(slots, wc, f.stage1Top, f.laterTop);
+        const n = t.path.length + 1, fixed = i => S.stages[i] && S.stages[i].status !== 'draft';
+        return { ...t, mts: Array.from({ length: n }, (_, i) => fixed(i) ? mts[i] : i === n - 1 ? f.finalMatches : f.matchesPerStage) }; });
+    } }
+  // Settings → stage team counts: re-work the stages after the one that changed.
+  // Settings → number of stages: spread the counts evenly between Stage 1 (or the last locked stage) and the Grand Final.
+  if (act === 'pathCount') { const form = el.closest('form'), want = Math.floor(Number(el.value));
+    refreshPathEd(form, (slots, wc, path, ws) => {
+      const fin = path[path.length - 1], keep = path.slice(0, lockedPathCount());
+      const out = want >= 2 && want <= 21 ? E.spreadPath(slots, want, fin, keep) : null;
+      if (!out) { toast(`${want} stages don't fit between ${keep.length ? keep[keep.length - 1] : slots} and a ${fin}-team Grand Final (every stage needs fewer teams than the one before, and enough for each group to send one). Try another number, or change the final's size.`); el.value = path.length + 1; return null; }
+      return { path: out, wcStage: fixWc(wc, out, ws <= out.length ? ws : 0, slots) };
+    });
+    if (form.elements.preset) form.elements.preset.value = 'custom'; }
+  if (act === 'sname') { const form = el.closest('form'); if (form) refreshPathEd(form, (slots, wc, path, wcStage) => ({ path, wcStage })); }
+  if (act === 'path' || act === 'pathBase' || act === 'pathWc' || act === 'pathWcOn') { const form = el.closest('form');
+    if (form) { refreshPathEd(form, (slots, wc, path, ws) => act === 'pathWc' ? { path, wcStage: ws } : tidyPath(slots, wc, path, ws, act === 'path' ? Number(el.dataset.k) : lockedPathCount() - 1));
+      if (form.elements.preset) form.elements.preset.value = 'custom'; } }
   if (act === 'tlogo') { const file = el.files[0]; if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { toast('Use a PNG, JPG or WEBP image'); return; }
     const img = new Image(), url = URL.createObjectURL(file);
@@ -1792,6 +2063,7 @@ document.addEventListener('click', e => {
     case 'emailLog': Cloud.emailLog().then(rows => { emailLogRows = rows || []; render(); }, err => toast(err.message)); break;
     case 'emailLogClose': emailLogRows = null; render(); break;
     case 'togglePw': showPw = !showPw; render(); break;
+    case 'sameNameToggle': sameNameOpen = !sameNameOpen; render(); break;
     case 'tlogoRemove': e.preventDefault(); delete S.settings.logo; log('Tournament logo removed', ''); done('Logo removed'); break;
     case 'sameRoom': { const fm = findMatch(el.dataset.m), pm = prevRoom(fm.g, fm.m), f = el.closest('form'); if (pm) { f.roomId.value = pm.roomId; f.roomPass.value = pm.roomPass; toast('Filled from Match ' + pm.no + '. Click Release room to send it.'); } break; }
     case 'deleteTeam': { const t = team(el.dataset.id); if (!t) break;
@@ -1823,7 +2095,22 @@ document.addEventListener('click', e => {
     }
     case 'wcRevoke': { const inv = S.wcInvites.find(i => i.token === el.dataset.token); if (!confirm('Cancel this invite link? It will stop working.')) break; inv.status = 'revoked'; log('Wild Card invite cancelled', inv.note || inv.token.slice(0, 6)); done('Invite cancelled'); break; }
     case 'removeWc': S.teams = S.teams.filter(t => t.id !== el.dataset.id); log('Wild Card removed', el.dataset.id); done(); break;
+    case 'pathDel': {   // Settings: remove one stage; the ones after it are re-worked
+      const form = el.closest('form'), k = Number(el.dataset.k);
+      refreshPathEd(form, (slots, wc, path, ws, mts, names) => { path.splice(k, 1); mts.splice(k + 1, 1); names.splice(k + 1, 1); return { ...tidyPath(slots, wc, path, ws > k + 1 ? ws - 1 : ws, k - 1), mts, names }; });
+      form.elements.preset.value = 'custom'; break;
+    }
+    case 'pathAdd': {   // Settings: one more stage; the unlocked counts are spread evenly again
+      const form = el.closest('form');
+      refreshPathEd(form, (slots, wc, path, ws) => {
+        const fin = path[path.length - 1], keep = path.slice(0, lockedPathCount()), out = E.spreadPath(slots, path.length + 2, fin, keep);
+        if (!out) { toast(`No room for another stage between ${keep.length ? keep[keep.length - 1] : slots} teams and a ${fin}-team Grand Final`); return null; }
+        return { path: out, wcStage: fixWc(wc, out, ws, slots) };
+      });
+      form.elements.preset.value = 'custom'; break;
+    }
     case 'gen1': {
+      const why = stage1Blocked(); if (why) { toast(why); return; }
       const ids = slotTeams().filter(t => t.status === 'approved').sort((a, b) => a.slotNo - b.slotNo).map(t => t.id);
       const stage = buildStage(0, ids, el.dataset.mode); S.stages.push(stage); S.settings.regOpen = false;
       log('Stage 1 generated', ids.length + ' teams, ' + stage.groups.length + ' groups (' + el.dataset.mode + ')'); done(stage.groups.length + ' groups created'); break;
@@ -1833,9 +2120,10 @@ document.addEventListener('click', e => {
       done('Wild Cards placed'); break;
     }
     case 'publish': {
-      if (st.groups.some(g => g.teamIds.length > 12)) { toast('A group has more than 12 teams'); return; }
+      const off = st.groups.find(g => g.teamIds.length !== E.GROUP_SIZE);
+      if (off) { toast(`Every group needs exactly 12 teams: ${gName(st, off)} has ${off.teamIds.length}`); return; }
       makeMatches(st); st.status = 'published';
-      st.groups.forEach(g => g.teamIds.forEach((id, i) => notify(id, 'group', st.index, `${S.settings.name} · ${st.name}: you are in ${st.final ? 'the Grand Final' : 'Group ' + GL(g.label)}, Slot ${i + 1}. First match ${matchDate(st, g.matches[0])}, ${g.matches[0].time} (${g.matches[0].map}). Check in on My Team before each match.`)));
+      st.groups.forEach(g => g.teamIds.forEach((id, i) => notify(id, 'group', st.index, `${S.settings.name} · ${st.name}: you are in ${st.final ? gName(st, g) : 'Group ' + GL(g.label)}, Slot ${i + 1}. First match ${matchDate(st, g.matches[0])}, ${g.matches[0].time} (${g.matches[0].map}). Check in on My Team before each match.`)));
       log(st.name + ' published', st.groups.length + ' groups'); done(st.name + ' published'); break;
     }
     case 'simulate': {
@@ -1844,14 +2132,21 @@ document.addEventListener('click', e => {
     }
     case 'qualify': {
       st.qualified = st.final ? [] : qualifiersOf(st); st.status = 'done';
-      st.groups.forEach(g => rowsOf(g).forEach(r => notify(r.teamId, 'result', st.index,
-        st.final ? `${S.settings.name} Grand Final: you finished #${r.rank} with ${r.points} points.${r.rank === 1 ? ' 🏆 Champions!' : ''}`
-          : st.qualified.includes(r.teamId) ? `${S.settings.name} · ${st.name}: QUALIFIED ✅ (rank #${r.rank} in Group ${GL(g.label)}, ${r.points} pts). Next stage groups coming soon.`
+      // In the Grand Final every finalist gets their overall place (all final groups ranked together).
+      if (st.final) finalRows(st).forEach(r => notify(r.teamId, 'result', st.index, `${S.settings.name} Grand Final: you finished #${r.rank} with ${r.points} points.${r.rank === 1 ? ' 🏆 Champions!' : ''}`));
+      else st.groups.forEach(g => rowsOf(g).forEach(r => notify(r.teamId, 'result', st.index,
+        st.qualified.includes(r.teamId) ? `${S.settings.name} · ${st.name}: QUALIFIED ✅ (rank #${r.rank} in Group ${GL(g.label)}, ${r.points} pts). Next stage groups coming soon.`
           : `${S.settings.name} · ${st.name}: eliminated (rank #${r.rank} in Group ${GL(g.label)}, ${r.points} pts). Thanks for playing!`)));
       log(st.final ? 'Tournament finished' : st.name + ' qualifiers approved', st.final ? '' : st.qualified.length + ' teams'); done(st.final ? '🏆 Tournament finished' : st.qualified.length + ' teams qualified'); break;
     }
     case 'genNext': {
-      const stage = buildStage(st.index + 1, st.qualified, 'seeded'); S.stages.push(stage);
+      const stage = buildStage(st.index + 1, st.qualified, 'seeded');
+      const want = bracket().path[st.index];
+      if (stage.entering !== want || stage.entering % E.GROUP_SIZE) {
+        const wcMsg = stage.wcJoin !== (Number(S.settings.wildCards) || 0) && st.index + 1 === bracket().wcStage ? ` ${wcTeams().length} Wild Card teams are approved but ${S.settings.wildCards} are planned.` : '';
+        toast(`${stage.name} should have ${want} teams but would get ${stage.entering}${stage.wcJoin ? ' (incl. ' + stage.wcJoin + ' Wild Cards)' : ''}.${wcMsg}`); return;
+      }
+      S.stages.push(stage);
       log(stage.name + ' generated', stage.entering + ' teams' + (stage.wcJoin ? ' incl. ' + stage.wcJoin + ' Wild Cards' : '')); done(stage.name + ' created'); break;
     }
     case 'approveResult': { const { m } = findMatch(el.dataset.m); m.resultStatus = 'approved'; log('Result approved', m.id); done('Approved'); break; }

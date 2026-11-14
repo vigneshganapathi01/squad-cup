@@ -213,5 +213,6 @@ const Cloud = (() => {
   function listenReload() { clearTimeout(reloadTimer); reloadTimer = setTimeout(() => queue.then(loadAll).then(render), 1500); }
 
   async function init() { await loadRole(); await loadAll(); listen(); return role; }
-  return { on, init, sync, loadAll, register, teamLogin, teamLogout, resetPassword, sendLogins, emailLog, teamPasswords, setPassword, get passwords() { return passwords; }, wcInviteInfo, registerWildcard, sendWcInvite, refreshTeam, checkin, complain, reset, signIn, signOut, get role() { return role; } };
+  const accessToken = async () => on ? (await sb.auth.getSession()).data.session?.access_token || null : null;
+  return { on, accessToken, init, sync, loadAll, register, teamLogin, teamLogout, resetPassword, sendLogins, emailLog, teamPasswords, setPassword, get passwords() { return passwords; }, wcInviteInfo, registerWildcard, sendWcInvite, refreshTeam, checkin, complain, reset, signIn, signOut, get role() { return role; } };
 })();

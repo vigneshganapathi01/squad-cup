@@ -58,6 +58,47 @@
   cx.fillStyle = '#f6f1e4'; cx.font = 'bold 40px sans-serif'; cx.fillText('TEAM THUNDER  ·  #2', 250, 260); cx.fillText('KILLS: 8', 380, 340);
   cx.fillStyle = '#a39d8a'; cx.font = '24px sans-serif'; cx.fillText('Demo screenshot', 390, 470);
   S.complaints.unshift({ teamId: thunder, matchId: tg.matches[2].id, matchLabel: 'Stage 4 · Match 3', reason: 'Our 8 kills show as 6. Screenshot attached.', shot: 'thunder-m3.png', shotData: cv.toDataURL('image/jpeg', 0.75), status: 'open', at: new Date().toISOString() });
+  // Screenshot test group: the teams and In Game Names from the sample Free Fire result screenshot
+  // (ocr-service/samples/match-b.webp), so "Upload screenshots" can be tried on its next match.
+  const ocrGroup = others[2] || others[others.length - 1];
+  const SAMPLE = [
+    ['Jd Esports', ['Jd.kuttyy!', 'Jd.hitlerr!', 'Jd.yashh!', 'INF SINGLE!!']],
+    ['KG Gaming', ['G_MASSᴼᴾ', 'KG_FREDY', 'KG_SHADOW', 'Mz.Jackrose8']],
+    ['KP Army', ['KP BEAST', 'KP SPARK', 'சந்திரசேகர்.', 'TN◉MADARA©']],
+    ['TA Clan', ['TA ZENITSU', 'TA JACK', 'TA GOD', 'TA BRITANNIA']],
+    ['Baba Squad', ['BABAYAGAAA', 'JERRY', 'AJAY', 'Kutty']],
+    ['Night Owls', ['OWL.Ravi', 'OWL.Siva', 'OWL.Mani', 'OWL.Hari']],
+    ['JJ Warriors', ['JJ.Devil4', 'Tw.Anandan05', 'JJ.Rocky', 'JJ.Blaze']],
+    ['UFC', ['UFC.WOLF', 'UFC.smurt', 'UFC.BEAST', 'UFC.Praveen']],
+    ['Dark Knights', ['DJaadhavan54', 'ɢᴏᴅ ᴏꜰ ᴇᴋ', 'ⓄBITO♡', 'சனி###']],
+    ['WeSp', ['WeSp Samir', 'WeSp Lunaris', 'WeSp Ram', 'WeSp Rabin']],
+    ['RES Esports', ['RES.TOXIC¹²', 'RES.SABUJ07', 'ANSAR -!!', 'RES.MADARA07']],
+    ['TL Hybrid', ['TL.HYBRID07', '7SGOD', '7SVENOM', 'SREE.HXZ']]];
+  if (ocrGroup) ocrGroup.teamIds.slice(0, 12).forEach((id, i) => { const t = team(id); t.name = SAMPLE[i][0]; SAMPLE[i][1].forEach((n, k) => { if (t.players[k]) t.players[k].name = n; }); });
+  // Second screenshot test group: the owner's sample (ocr-service/samples/match-c.webp, ranks 1–10), registered with
+  // styled In Game Names (small capitals, ᑌ, ✓, ♡ …) so the look-alike matching can be seen: the table shows these exact names.
+  const ocrGroup2 = others[1];
+  const SAMPLE2 = [
+    ['ᑌD Esports', ['ᑌD ᴋᴜᴛᴛʏ ☣', 'ᑌD ᴊᴀᴄᴋ ☣', 'ᑌD ʀɪᴛʜɪᴄᴋ ♂', 'ᑌD ʜɪᴛʟᴇʀ ☣']],
+    ['Legend Squad', ['TONY', 'TN_LEGEND✓⁘', 'TOJI', 'The_ᴡɪᴛᴄʜᴇʀ♡']],
+    ['RK Gaming', ['RK ᴄʜᴜᴛᴛɪ !!', 'Rʙᴢ k4i5er11', 'RK ᴠɪᴊᴀʏ !', 'NKG.alpha07']],
+    ['Rk Clan', ['M11PLAYS15!', 'Rk.Shinra18!', 'Rk.Mt7!', 'RK.gz.marco']],
+    ['SRZ Army', ['SP!DY-SRZ!', 'A!ZEN-18', 'Pᴀɪɴ Lᴇᴏ', 'ROCKLEE~SRZ!']],
+    ['DZ Carnage', ['DZ.CARNAGE!!', 'ML AXE 777', 'INF.Tenzo07!', 'KETTAVAN']],
+    ['NBS Esports', ['NBS ʙʀᴜᴛᴀʟ', 'MLC.OXFORD', 'NBS ɪɴꜰᴇʀɴᴏ', 'NBS ʀᴇᴅᴇʏᴇ']],
+    ['F1 Racers', ['F1 ᴄᴏᴏʟɪᴇ', 'F1 ᴠɪʀᴜꜱ', 'F1 BONXZ444', 'F1 ɢʀᴏᴏᴛ']],
+    ['BZ Tamizha', ['BZ சரண்', 'BZ தமிழ்', 'BZ ~SUBASH', 'BZ Sᴘᴇᴇᴅ']],
+    ['HL Hunters', ['HL K1zhi', 'A.I Prakaஷ்', 'HL.God!03', 'HL.Aiger!K22']]];
+  if (ocrGroup2) ocrGroup2.teamIds.slice(0, SAMPLE2.length).forEach((id, i) => { const t = team(id); t.name = SAMPLE2[i][0]; SAMPLE2[i][1].forEach((n, k) => { if (t.players[k]) t.players[k].name = n; }); });
+  // Same names in different teams (allowed: different players, different UIDs), to show how screenshots settle them:
+  // inside this match (Group 3's other two teams) and in another group.
+  if (ocrGroup2) {
+    const [x, y] = ocrGroup2.teamIds.slice(SAMPLE2.length).map(team);
+    if (x) x.players[0].name = 'ᴋᴜᴛᴛʏ';        // looks like ᑌD Esports' KUTTY once its tag is set aside
+    if (y) y.players[1].name = 'TOJI';         // the same name as Legend Squad's TOJI
+  }
+  const clashGroup = others[0];
+  if (clashGroup) { team(clashGroup.teamIds[0]).players[2].name = 'ᑌD ᴊᴀᴄᴋ ☣'; team(clashGroup.teamIds[1]).players[0].name = 'TONY'; }
   log('Demo data loaded', 'Stage 4 in progress');
   save();
   render();

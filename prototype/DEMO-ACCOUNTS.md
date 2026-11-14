@@ -19,7 +19,7 @@ For the online version, create these as real users in Supabase. See SETUP-ONLINE
 | Team Lightning | shown after registering (e.g. FF-0259) | 9300000010 | Registered through the form during the demo |
 | Creator Kings | FF-0253 | 9000007063 | Wild Card team |
 
-The other 251 sample teams and 5 Wild Cards are created by **Settings → Load sample data**. Each has its own Team ID and captain mobile, which you can see in **Admin → Teams**.
+The other 251 sample teams and 11 more Wild Cards (12 in all) are created by **Settings → Load sample data**. Each has its own Team ID and captain mobile, which you can see in **Admin → Teams**.
 
 ## Test registration data (Team Lightning)
 | Player | In Game Name | Mobile | Email | Free Fire UID |
