@@ -1454,3 +1454,7 @@ html::after{background-size:430px 180px!important;opacity:.45}
 /* sparks sit between the background art and the UI: above the page art, behind the framed window */
 body::after,html::after{z-index:0!important}
 .frame{position:relative;z-index:1}
+/* ===== Hero badge: India Cup tournament logo (free-standing shield, no ring) ===== */
+.th-logo:not(:has(img)){width:132px!important;height:132px!important;border:0!important;border-radius:0!important;
+  background:url(art/india-cup.webp) 50% 50%/contain no-repeat!important;filter:drop-shadow(0 10px 22px rgba(0,0,0,.45))}
+@media(max-width:700px){.th-logo:not(:has(img)){width:84px!important;height:84px!important}}
