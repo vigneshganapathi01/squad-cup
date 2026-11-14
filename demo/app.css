@@ -1287,7 +1287,7 @@ h1,h2,.hero-title,.groupcard h3{letter-spacing:.03em!important}
 .frame{background:#1e2235!important}
 .frame:before{content:""!important;position:absolute;inset:0!important;height:auto!important;opacity:1!important;z-index:-1;pointer-events:none;
   background:url(art/lines-tl.svg) 0 0/max(1600px,100%) auto no-repeat,url(art/lines-br.svg) 100% 100%/1600px auto no-repeat,linear-gradient(180deg,#363a4b 0,#2b2f43 280px,#20253a 620px,#1e2235 900px,#1c2033 100%);
-  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.7) 0,rgba(0,0,0,.88) 200px,#000 360px);mask-image:linear-gradient(180deg,rgba(0,0,0,.7) 0,rgba(0,0,0,.88) 200px,#000 360px)}
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.86) 0,rgba(0,0,0,.94) 200px,#000 340px);mask-image:linear-gradient(180deg,rgba(0,0,0,.86) 0,rgba(0,0,0,.94) 200px,#000 340px)}
 .frame{background:transparent!important}
 .frame>.top,.frame>.rail{background:rgba(30,34,53,.25)!important}
 @media(max-width:700px){.frame:before{background-size:1000px auto,1000px auto,auto}}
@@ -1458,3 +1458,85 @@ body::after,html::after{z-index:0!important}
 .th-logo:not(:has(img)){width:132px!important;height:132px!important;border:0!important;border-radius:0!important;
   background:url(art/india-cup.webp) 50% 50%/contain no-repeat!important;filter:drop-shadow(0 10px 22px rgba(0,0,0,.45))}
 @media(max-width:700px){.th-logo:not(:has(img)){width:84px!important;height:84px!important}}
+/* ===== More sparks: taller band, denser + a bit brighter, plus a third mid layer (still behind the UI frame) ===== */
+body::after,html::after,html::before{height:260px!important}
+body::after{opacity:.95!important;background-size:520px 260px!important;animation:sc-rise2 8s linear infinite,sc-flicker2 2.4s ease-in-out infinite!important;
+  background-image:
+    radial-gradient(3px 10px at 48px 200px,rgba(255,220,130,1),rgba(255,140,30,.6) 45%,transparent 100%),
+    radial-gradient(1.4px 6px at 120px 70px,#ffd27a 35%,transparent 100%),
+    radial-gradient(1.2px 5px at 168px 230px,#ffc04a 35%,transparent 100%),
+    radial-gradient(1.2px 4.5px at 205px 150px,#ffc04a 35%,transparent 100%),
+    radial-gradient(2.6px 8px at 268px 110px,rgba(255,210,115,1),rgba(255,130,20,.55) 45%,transparent 100%),
+    radial-gradient(1.2px 4.5px at 331px 210px,#ffcf6a 35%,transparent 100%),
+    radial-gradient(1.6px 6px at 382px 40px,#ffb840 35%,transparent 100%),
+    radial-gradient(1.2px 4px at 430px 168px,#ffd88a 35%,transparent 100%),
+    radial-gradient(2px 7px at 470px 245px,rgba(255,200,100,1),rgba(255,120,20,.5) 45%,transparent 100%),
+    radial-gradient(1.4px 5px at 505px 90px,#ffbe55 35%,transparent 100%)!important}
+html::after{opacity:.7!important;background-size:400px 260px!important;animation:sc-rise-far2 13s linear infinite!important;
+  background-image:
+    radial-gradient(1px 3.4px at 28px 130px,#ffcf7a 35%,transparent 100%),
+    radial-gradient(1px 3px at 80px 36px,#ffbb50 35%,transparent 100%),
+    radial-gradient(1.1px 3.8px at 140px 215px,#ffd27a 35%,transparent 100%),
+    radial-gradient(.9px 3px at 196px 84px,#ffc760 35%,transparent 100%),
+    radial-gradient(1.1px 3.4px at 252px 175px,#ffb840 35%,transparent 100%),
+    radial-gradient(.9px 3px at 306px 18px,#ffd88a 35%,transparent 100%),
+    radial-gradient(1.3px 4.4px at 352px 240px,#ffc04a 35%,transparent 100%),
+    radial-gradient(1px 3.2px at 384px 120px,#ffcf6a 35%,transparent 100%)!important}
+html::before{content:"";position:fixed;left:0;right:0;bottom:0;z-index:0;pointer-events:none;opacity:.8;background-repeat:repeat;
+  background-size:690px 260px;animation:sc-rise-mid 10.5s linear infinite,sc-flicker2 3.1s ease-in-out infinite reverse;
+  -webkit-mask-image:linear-gradient(0deg,#000 0,#000 30%,transparent 100%);mask-image:linear-gradient(0deg,#000 0,#000 30%,transparent 100%);
+  background-image:
+    radial-gradient(1.8px 6px at 60px 160px,#ffc860 35%,transparent 100%),
+    radial-gradient(2.4px 8px at 210px 60px,rgba(255,214,120,1),rgba(255,140,30,.5) 45%,transparent 100%),
+    radial-gradient(1.4px 5px at 330px 220px,#ffd27a 35%,transparent 100%),
+    radial-gradient(1.6px 5.5px at 470px 120px,#ffb640 35%,transparent 100%),
+    radial-gradient(2.2px 7px at 600px 200px,rgba(255,205,105,1),rgba(255,125,20,.5) 45%,transparent 100%),
+    radial-gradient(1.2px 4px at 660px 30px,#ffd88a 35%,transparent 100%)}
+@keyframes sc-rise2{from{background-position:0 260px}to{background-position:-100px 0}}
+@keyframes sc-rise-far2{from{background-position:0 260px}to{background-position:80px 0}}
+@keyframes sc-rise-mid{from{background-position:0 260px}to{background-position:-40px 0}}
+@keyframes sc-flicker2{0%,100%{opacity:.95}40%{opacity:.7}65%{opacity:1}}
+@media(prefers-reduced-motion:reduce){body::after,html::after,html::before{animation:none!important}}
+@media(max-width:700px){body::after,html::after,html::before{bottom:64px!important;height:140px!important}}
+/* ===== Desktop: the framed window fits the viewport; the page itself doesn't scroll, the content scrolls inside the frame ===== */
+@media(min-width:901px){
+  html,body{height:100%;overflow:hidden}
+  .frame{height:calc(100vh - 84px)!important;min-height:0!important;margin:60px auto 24px!important;overflow:hidden!important;
+    grid-template-rows:58px minmax(0,1fr) auto!important}
+  @media(max-width:1529px){.frame{margin-left:44px!important;margin-right:44px!important}}
+  .frame>.rail{position:relative!important;top:auto!important;height:auto!important;align-self:stretch!important}
+  .frame>main{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scroll-behavior:smooth;
+    scrollbar-gutter:stable;padding-right:18px!important;scrollbar-width:thin;scrollbar-color:rgba(113,96,252,.7) transparent}
+  /* the scrollbar lives in the frame's right gutter (marked area) */
+  .frame>main::-webkit-scrollbar{width:10px}
+  .frame>main::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-left:1px solid rgba(255,255,255,.05);margin:10px 0}
+  .frame>main::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#8a7bff,#5b4be0);border:2px solid transparent;background-clip:padding-box;border-radius:6px;min-height:48px}
+  .frame>main::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#a294ff,#7160fc);background-clip:padding-box;border:2px solid transparent}
+  .ptabs{top:0!important}
+}
+/* ===== Dimmer background art behind the header (less see-through frame top, softer character) ===== */
+.stage-art{opacity:.72}
+
+/* ===== A–Z letter badge for teams without an emblem (reference: colour tile, light streaks, big slashed letter) ===== */
+span.av.av-letter{display:inline-grid;place-items:center;overflow:hidden;color:#fff;
+  background-image:repeating-linear-gradient(118deg,rgba(255,255,255,0) 0 9%,rgba(255,255,255,.16) 9% 12%,rgba(255,255,255,0) 12% 26%),
+    linear-gradient(160deg,rgba(255,255,255,.18),rgba(0,0,0,.18))!important}
+span.av.av-letter b{position:relative;display:block;font:500 1em/1 var(--display);letter-spacing:0;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.25);transform:skewX(-6deg)}
+span.av.av-letter b::after{content:"";position:absolute;left:-2%;top:0;bottom:0;width:52%;pointer-events:none;
+  background:repeating-linear-gradient(120deg,transparent 0 2.4px,var(--tc) 2.4px 3.4px);mix-blend-mode:normal}
+.groupcard li span.av.av-letter{background-image:linear-gradient(135deg,#191d2e 0 7px,transparent 7.5px),linear-gradient(315deg,#191d2e 0 7px,transparent 7.5px),
+  repeating-linear-gradient(118deg,rgba(255,255,255,0) 0 9%,rgba(255,255,255,.16) 9% 12%,rgba(255,255,255,0) 12% 26%)!important}
+
+/* ===== Match cards: map backdrop behind the text (add more maps as art/maps/<name>.webp + one line here) ===== */
+.mcard{position:relative;overflow:hidden;isolation:isolate}
+.mcard[data-map]::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-position:center;background-size:cover;opacity:0}
+.mcard[data-map="alpine"]::before{opacity:1;background-image:
+  linear-gradient(90deg,rgba(24,27,42,.95) 0%,rgba(24,27,42,.86) 42%,rgba(24,27,42,.6) 100%),
+  linear-gradient(0deg,rgba(24,27,42,.7),rgba(24,27,42,0) 60%),
+  url(art/maps/alpine.webp)}
+/* future maps: .mcard[data-map="bermuda"]::before{opacity:1;background-image:<same two gradients>,url(art/maps/bermuda.webp)} */
+/* ===== GFF Latin (supplied by the project owner) replaces GEAR across the UI. Regular + Medium only: no bold ===== */
+@font-face{font-family:"GFF Latin";src:url(fonts/GFF-Latin-Regular.woff2) format("woff2");font-weight:300 400;font-style:normal;font-display:swap}
+@font-face{font-family:"GFF Latin";src:url(fonts/GFF-Latin-Medium.woff2) format("woff2");font-weight:500 900;font-style:normal;font-display:swap}
+:root{--display:"GFF Latin",Gear,Inter,sans-serif;--wide:"GFF Latin",Gear,Inter,sans-serif;--num:"GFF Latin",Gear,Inter,sans-serif}
+html,body{font-family:"GFF Latin",Gear,Inter,ui-sans-serif,system-ui,sans-serif}

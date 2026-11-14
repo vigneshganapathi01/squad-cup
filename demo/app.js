@@ -42,14 +42,16 @@ function avatar(t, size = 22) {
   const c = COLORS[[...t.name].reduce((a, ch) => a + ch.charCodeAt(0), 0) % COLORS.length];
   const ic = teamIcon(t.name);
   if (ic) return `<span class="av av-ic" role="img" aria-label="${esc(ini)}" style="width:${size}px;height:${size}px;background:${c};color:${c};--tc:${c}"><svg viewBox="0 0 512 512" aria-hidden="true"><use href="art/team-icons.svg#ti-${ic}"/></svg></span>`;
-  return `<span class="av" style="width:${size}px;height:${size}px;background:${c};font-size:${Math.round(size * .42)}px">${esc(ini)}</span>`;
+  // no emblem for this name: an A–Z letter badge (team colour tile, big slashed letter)
+  const letter = (t.name.toUpperCase().match(/[A-Z]/) || ['?'])[0];
+  return `<span class="av av-letter" role="img" aria-label="${esc(ini)}" style="width:${size}px;height:${size}px;background:${c};--tc:${c};font-size:${Math.round(size * .66)}px"><b>${letter}</b></span>`;
 }
 // UI only: pick a placeholder emblem (art/team-icons.svg, game-icons.net CC BY 3.0) from a word in the team name.
 const TEAM_ICONS = ['thunder', 'blaze', 'cobra', 'storm', 'ghost', 'rider', 'titan', 'wolf', 'venom', 'hawk', 'viper', 'joker', 'shadow', 'phoenix', 'raptor', 'falcon', 'rogue', 'inferno', 'fury', 'spartan', 'kraken', 'nova', 'reaper', 'panther', 'sniper', 'dragon', 'bullet', 'ninja', 'legend', 'alpha', 'warriors'];
 function teamIcon(name) {
   const words = String(name || '').toLowerCase().split(/\s+/).map(w => w.replace(/s$/, ''));
   for (const w of words) { const k = TEAM_ICONS.find(i => i === w || i === w + 's'); if (k) return k; }
-  return 'default';
+  return null;
 }
 const tname = id => { const t = team(id); return t ? `<span class="tn">${avatar(t)}<span>${esc(t.name)}</span>${t.entry === 'WC' ? ' <span class="badge b-wc">WC</span>' : ''}</span>` : '?'; };
 const slotTeams = () => S.teams.filter(t => t.entry === 'SLOT');
@@ -627,7 +629,7 @@ function viewOverview() {
   const recent = ms.filter(x => x.m.resultStatus === 'approved').slice(-4).reverse();
   const matchCard = ({ st, g, m }) => {
     const top = m.results ? Object.entries(m.results).filter(([, r]) => r.place === 1)[0] : null;
-    return `<div class="mcard"><div class="row between"><span class="small muted">${st.final ? 'Grand Final' : st.name + ' · Group ' + GL(g.label)}</span>${matchBadge(m)}</div>
+    return `<div class="mcard${m.status === 'live' ? ' is-live' : ''}" data-map="${mapShown(m) ? esc(String(m.map).toLowerCase().replace(/\s+/g, '-')) : ''}"><div class="row between"><span class="small muted">${st.final ? 'Grand Final' : st.name + ' · Group ' + GL(g.label)}</span>${matchBadge(m)}</div>
       <div class="mtitle">Match ${m.no}${mapShown(m) ? ' · ' + esc(m.map) : ''}</div><div class="small muted">${matchDate(st, m)} · ${m.time}</div>
       ${top ? `<div class="small" style="margin-top:6px">🏆 Booyah: ${tname(top[0])}</div>` : `<div class="avs">${g.teamIds.slice(0, 8).map(id => avatar(team(id), 22)).join('')}${g.teamIds.length > 8 ? `<span class="small muted">+${g.teamIds.length - 8}</span>` : ''}</div>`}</div>`;
   };
