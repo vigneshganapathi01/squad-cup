@@ -1360,3 +1360,97 @@ img.av{border-radius:0!important;clip-path:polygon(28% 0,100% 0,100% 72%,72% 100
   background:transparent!important;border:0!important;border-bottom:1px solid rgba(255,255,255,.05)!important;clip-path:none!important}
 .card.lb table.mini td b,.card.lb table.mini tbody tr:first-child td b{font:500 13px/1 var(--display)!important;color:#fff!important}
 .card.lb table.mini th{padding:6px 10px;font-size:10px}
+/* ===== Team emblem badges (game-icons.net placeholders) ===== */
+.av.av-ic{display:inline-grid;place-items:center;color:#fff}
+.av.av-ic svg{width:68%;height:68%;fill:currentColor;filter:drop-shadow(0 1px 0 rgba(0,0,0,.25))}
+.foot a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+/* ===== Ember sparks: a thin CSS-only band rising from behind the frame's top edge (separates the art from the UI) ===== */
+body::after,html::after{content:"";position:absolute;left:0;right:0;top:20px;height:220px;z-index:0;pointer-events:none;background-repeat:repeat;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 35%,#000 75%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 35%,#000 75%,transparent 100%)}
+/* near layer: brighter, a few glowing streaks */
+body::after{opacity:.85;background-size:560px 220px;animation:sc-rise 9s linear infinite,sc-flicker 2.8s ease-in-out infinite;
+  background-image:
+    radial-gradient(2.6px 9px at 48px 170px,rgba(255,214,120,1),rgba(255,140,30,.55) 45%,transparent 100%),
+    radial-gradient(1.2px 5px at 132px 60px,#ffd27a 30%,transparent 100%),
+    radial-gradient(1px 4px at 205px 140px,#ffc04a 30%,transparent 100%),
+    radial-gradient(2.2px 7px at 288px 96px,rgba(255,206,110,1),rgba(255,130,20,.5) 45%,transparent 100%),
+    radial-gradient(1px 4px at 351px 196px,#ffcf6a 30%,transparent 100%),
+    radial-gradient(1.4px 5px at 420px 30px,#ffb840 30%,transparent 100%),
+    radial-gradient(1px 3.5px at 488px 120px,#ffd88a 30%,transparent 100%),
+    radial-gradient(1.6px 6px at 530px 178px,#ffbe55 30%,transparent 100%)}
+/* far layer: smaller, slower, dimmer, drifting the other way */
+html::after{opacity:.55;background-size:430px 220px;animation:sc-rise-far 14s linear infinite;
+  background-image:
+    radial-gradient(.9px 3px at 30px 110px,#ffcf7a 30%,transparent 100%),
+    radial-gradient(.8px 2.6px at 96px 30px,#ffbb50 30%,transparent 100%),
+    radial-gradient(1px 3.4px at 170px 182px,#ffd27a 30%,transparent 100%),
+    radial-gradient(.8px 2.8px at 236px 70px,#ffc760 30%,transparent 100%),
+    radial-gradient(1px 3px at 300px 150px,#ffb840 30%,transparent 100%),
+    radial-gradient(.8px 2.6px at 372px 12px,#ffd88a 30%,transparent 100%),
+    radial-gradient(1.2px 4px at 410px 205px,#ffc04a 30%,transparent 100%)}
+@keyframes sc-rise{from{background-position:0 220px}to{background-position:-90px 0}}
+@keyframes sc-rise-far{from{background-position:0 220px}to{background-position:70px 0}}
+@keyframes sc-flicker{0%,100%{opacity:.85}45%{opacity:.6}70%{opacity:.95}}
+@media(prefers-reduced-motion:reduce){body::after,html::after{animation:none}}
+@media(max-width:700px){body::after,html::after{top:0;height:150px}}
+/* ===== Team logos like the reference game list: the emblem itself in the team colour, no tile behind it ===== */
+span.av.av-ic{background:transparent!important;background-image:none!important;clip-path:none!important;border-radius:0!important;overflow:visible}
+span.av.av-ic svg{width:100%;height:100%;fill:currentColor;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45))}
+/* group rows: bar outline + stripes still take the team colour (now from --tc, since the badge has no fill) */
+.groupcard li .av.av-ic::before{background:var(--tc)!important}
+.groupcard li span.av.av-ic{width:24px!important;height:24px!important}
+.card.lb .av.av-ic{width:26px!important;height:26px!important}
+/* ===== Remove the team avatar stack beside the tournament title ===== */
+.th-avs{display:none!important}
+
+/* ===== One colour for teams: emblems in their original white, neutral bars with a violet accent end ===== */
+span.av.av-ic{color:#fff!important}
+.groupcard li .av.av-ic::before,.groupcard li .av::before{opacity:1!important;
+  background:linear-gradient(90deg,rgba(255,255,255,.14) 0,rgba(255,255,255,.14) calc(100% - 64px),rgba(113,96,252,.95) calc(100% - 40px))!important}
+.groupcard li:hover .av::before{background:linear-gradient(90deg,rgba(113,96,252,.6),rgba(113,96,252,.95))!important}
+
+/* ===== Sparks: move the ember band to the bottom of the viewport, rising up ===== */
+body::after,html::after{position:fixed!important;top:auto!important;bottom:0!important;height:180px!important;z-index:30!important;
+  -webkit-mask-image:linear-gradient(0deg,#000 0,#000 30%,transparent 100%)!important;mask-image:linear-gradient(0deg,#000 0,#000 30%,transparent 100%)!important}
+@keyframes sc-rise{from{background-position:0 180px}to{background-position:-90px 0}}
+@keyframes sc-rise-far{from{background-position:0 180px}to{background-position:70px 0}}
+body::after{background-size:560px 180px!important;opacity:.7}
+html::after{background-size:430px 180px!important;opacity:.45}
+@media(max-width:700px){body::after,html::after{bottom:64px!important;height:110px!important}}
+/* ===== Emblem colours: each logo in its own natural colour (fixed per emblem, not per team) ===== */
+.av-ic use{fill:#e9ebf3}
+.av-ic use[href$="#ti-dragon"]{fill:#e5483d}
+.av-ic use[href$="#ti-ghost"]{fill:#bfe7ff}
+.av-ic use[href$="#ti-wolf"]{fill:#aeb6c4}
+.av-ic use[href$="#ti-alpha"]{fill:#9fb3cf}
+.av-ic use[href$="#ti-hawk"]{fill:#c98a3e}
+.av-ic use[href$="#ti-falcon"]{fill:#d9a25a}
+.av-ic use[href$="#ti-phoenix"]{fill:#ff7a2e}
+.av-ic use[href$="#ti-kraken"]{fill:#a774ff}
+.av-ic use[href$="#ti-cobra"]{fill:#47c96b}
+.av-ic use[href$="#ti-viper"]{fill:#7fd14a}
+.av-ic use[href$="#ti-venom"]{fill:#9be84a}
+.av-ic use[href$="#ti-raptor"]{fill:#4fbf7a}
+.av-ic use[href$="#ti-thunder"]{fill:#ffd23f}
+.av-ic use[href$="#ti-storm"]{fill:#5aa8ff}
+.av-ic use[href$="#ti-blaze"]{fill:#ff8a1f}
+.av-ic use[href$="#ti-inferno"]{fill:#ff5a2a}
+.av-ic use[href$="#ti-fury"]{fill:#ff4655}
+.av-ic use[href$="#ti-sniper"]{fill:#ff4655}
+.av-ic use[href$="#ti-joker"]{fill:#c45cff}
+.av-ic use[href$="#ti-nova"]{fill:#ff6ad5}
+.av-ic use[href$="#ti-shadow"]{fill:#8e8bb8}
+.av-ic use[href$="#ti-ninja"]{fill:#c7cbe0}
+.av-ic use[href$="#ti-rogue"]{fill:#d0565c}
+.av-ic use[href$="#ti-reaper"]{fill:#c9ccd6}
+.av-ic use[href$="#ti-spartan"]{fill:#d6a84a}
+.av-ic use[href$="#ti-legend"]{fill:#f5b81c}
+.av-ic use[href$="#ti-bullet"]{fill:#e0b15a}
+.av-ic use[href$="#ti-panther"]{fill:#f2b230}
+.av-ic use[href$="#ti-titan"]{fill:#9aa6ff}
+.av-ic use[href$="#ti-rider"]{fill:#ff8f3a}
+.av-ic use[href$="#ti-warriors"]{fill:#b7c3d6}
+.av-ic use[href$="#ti-default"]{fill:#b7c3d6}
+/* sparks sit between the background art and the UI: above the page art, behind the framed window */
+body::after,html::after{z-index:0!important}
+.frame{position:relative;z-index:1}

@@ -40,7 +40,16 @@ function avatar(t, size = 22) {
   if (t.logo && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(t.logo)) return `<img class="av" src="${esc(t.logo)}" alt="" width="${size}" height="${size}" style="width:${size}px;height:${size}px">`;
   const ini = t.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const c = COLORS[[...t.name].reduce((a, ch) => a + ch.charCodeAt(0), 0) % COLORS.length];
+  const ic = teamIcon(t.name);
+  if (ic) return `<span class="av av-ic" role="img" aria-label="${esc(ini)}" style="width:${size}px;height:${size}px;background:${c};color:${c};--tc:${c}"><svg viewBox="0 0 512 512" aria-hidden="true"><use href="art/team-icons.svg#ti-${ic}"/></svg></span>`;
   return `<span class="av" style="width:${size}px;height:${size}px;background:${c};font-size:${Math.round(size * .42)}px">${esc(ini)}</span>`;
+}
+// UI only: pick a placeholder emblem (art/team-icons.svg, game-icons.net CC BY 3.0) from a word in the team name.
+const TEAM_ICONS = ['thunder', 'blaze', 'cobra', 'storm', 'ghost', 'rider', 'titan', 'wolf', 'venom', 'hawk', 'viper', 'joker', 'shadow', 'phoenix', 'raptor', 'falcon', 'rogue', 'inferno', 'fury', 'spartan', 'kraken', 'nova', 'reaper', 'panther', 'sniper', 'dragon', 'bullet', 'ninja', 'legend', 'alpha', 'warriors'];
+function teamIcon(name) {
+  const words = String(name || '').toLowerCase().split(/\s+/).map(w => w.replace(/s$/, ''));
+  for (const w of words) { const k = TEAM_ICONS.find(i => i === w || i === w + 's'); if (k) return k; }
+  return 'default';
 }
 const tname = id => { const t = team(id); return t ? `<span class="tn">${avatar(t)}<span>${esc(t.name)}</span>${t.entry === 'WC' ? ' <span class="badge b-wc">WC</span>' : ''}</span>` : '?'; };
 const slotTeams = () => S.teams.filter(t => t.entry === 'SLOT');
