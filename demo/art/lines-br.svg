@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" fill="none" stroke-linejoin="miter">
+  <!-- same circuit lines, turned 180° for the bottom-right corner -->
+  <g transform="rotate(180 800 450)">
+    <g id="l" stroke-width="1.5">
+      <path d="M0 140H152L300-8"/>
+      <path d="M-10 510L366 138H466L612-8"/>
+      <path d="M1290-6L1137 142H945L640 446"/>
+    </g>
+    <use href="#l" stroke="rgba(8,10,20,.5)"/>
+    <use href="#l" stroke="rgba(255,255,255,.05)" transform="translate(0 -1.5)"/>
+  </g>
+</svg>
