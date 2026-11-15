@@ -57,6 +57,33 @@ const tname = id => { const t = team(id); return t ? `<span class="tn">${avatar(
 const slotTeams = () => S.teams.filter(t => t.entry === 'SLOT');
 const usedSlots = () => slotTeams().filter(t => t.status === 'pending' || t.status === 'approved').length;
 const maskMobile = m => m ? m.slice(0, 2) + 'xxxxxx' + m.slice(-2) : '';
+// ---------- in-page "Are you sure?" and "type a reply" boxes ----------
+// Some browsers and embedded views (like the app's preview pane) block window.confirm/prompt: they return "Cancel" at once
+// without showing anything, so the button seemed to do nothing. These boxes are part of the page instead. The action asks
+// first (the box opens and the action stops); OK runs the same button or form again, now with the answer.
+function confirmed(el, msg) {
+  if (el && el.dataset.askOk === '1') { delete el.dataset.askOk; return true; }
+  openAsk({ el, msg }); return false;
+}
+function askText(el, msg, def) {
+  if (el && el.dataset.askAns !== undefined) { const a = el.dataset.askAns; delete el.dataset.askAns; return a; }
+  openAsk({ el, msg, input: true, def: def || '' }); return null;
+}
+function showInfo(msg) { openAsk({ msg, info: true }); }
+function openAsk(o) {
+  document.querySelector('.ask-pop')?.remove();
+  const box = document.createElement('div'); box.className = 'ask-pop'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+  box.innerHTML = `<div class="card"><p>${esc(o.msg).replace(/\n/g, '<br>')}</p>${o.input ? `<textarea rows="3" aria-label="Your reply">${esc(o.def)}</textarea>` : ''}
+    <div class="row">${o.info ? '' : '<button type="button" class="btn ghost" data-ask="no">Cancel</button>'}<button type="button" class="btn" data-ask="yes">OK</button></div></div>`;
+  const done = yes => { box.remove(); document.removeEventListener('keydown', key, true);
+    if (!yes || o.info || !o.el) return;
+    if (o.input) o.el.dataset.askAns = box.querySelector('textarea').value; else o.el.dataset.askOk = '1';
+    if (o.el.tagName === 'FORM') o.el.requestSubmit(); else o.el.click(); };
+  const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+  box.addEventListener('click', e => { const b = e.target.closest('[data-ask]'); if (b) { e.stopPropagation(); done(b.dataset.ask === 'yes'); } else if (e.target === box) done(false); });
+  document.addEventListener('keydown', key, true);
+  document.body.appendChild(box); (box.querySelector('textarea') || box.querySelector('[data-ask=yes]')).focus();
+}
 let toastTimer;
 function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2600); }
 function statusBadge(s) {
@@ -2076,7 +2103,7 @@ document.addEventListener('submit', e => {
     const ci = f.dataset.c;
     if (ci !== undefined && ci !== '') {
       const c = S.complaints[Number(ci)], mine = res[c.teamId];
-      const ans = prompt('Reply to the team:', `Result corrected: ${resultText(mine)} (was ${resultText(m.results[c.teamId])}).`); if (ans === null) return;
+      const ans = askText(f, 'Reply to the team:', `Result corrected: ${resultText(mine)} (was ${resultText(m.results[c.teamId])}).`); if (ans === null) return;
       c.status = 'corrected'; c.answer = ans; notify(c.teamId, 'complaint', c.matchId + '|' + Date.now(), `${S.settings.name} · ${c.matchLabel}: ${ans}`);
     }
     m.results = res;
@@ -2089,7 +2116,7 @@ document.addEventListener('submit', e => {
     const what = `${team(teamId)?.name}: ${fm.st.name} M${fm.m.no} ${resultText(before)} → ${resultText(after)}`;
     if (f.dataset.c !== undefined && f.dataset.c !== '') {
       const c = S.complaints[Number(f.dataset.c)];
-      const ans = prompt('Reply to the team:', `Result corrected: ${resultText(after)} (was ${resultText(before)}).`); if (ans === null) { Object.assign(fm.m.results[teamId], before); return; }
+      const ans = askText(f, 'Reply to the team:', `Result corrected: ${resultText(after)} (was ${resultText(before)}).`); if (ans === null) { Object.assign(fm.m.results[teamId], before); return; }
       c.status = 'corrected'; c.answer = ans; notify(teamId, 'complaint', c.matchId + '|' + Date.now(), `${S.settings.name} · ${c.matchLabel}: ${ans}`);
     }
     log('Result corrected', what); openFix = null; save(); toast('Result updated'); render(); return;
@@ -2257,7 +2284,7 @@ document.addEventListener('submit', e => {
   if (kind === 'setpw') {
     const pw = String(fd.get('pw') || '').trim(), mail = !!fd.get('email'), t = team(f.dataset.id);
     if (pw && (pw.length < 6 || /\s/.test(pw))) { toast('Use 6–40 characters with no spaces'); return; }
-    if (!confirm(`Set a new password for ${t.name}?${mail ? '\nIt will be emailed to ' + t.players[0].email + '.' : ''}\nThe team will be signed out on every device.`)) return;
+    if (!confirmed(f, `Set a new password for ${t.name}?${mail ? '\nIt will be emailed to ' + t.players[0].email + '.' : ''}\nThe team will be signed out on every device.`)) return;
     const btn = f.querySelector('button'); btn.disabled = true;
     Cloud.setPassword(t.id, pw, mail).then(res => { pwResult = { id: t.id, emailed: res.emailed }; toast(mail && !res.emailed ? 'Password saved, but not emailed: set up Brevo and the sender email first' : 'Password saved'); render(); },
       err => { btn.disabled = false; toast(err.message); });
@@ -2405,7 +2432,7 @@ document.addEventListener('change', e => {
       });
       log('Google Form import', ok + ' teams imported, ' + bad.length + ' skipped'); save(); render();
       toast(ok + ' imported' + (bad.length ? ', ' + bad.length + ' skipped' : ''));
-      if (bad.length) alert('Skipped rows:\n' + bad.slice(0, 20).join('\n'));
+      if (bad.length) showInfo('Skipped rows:\n' + bad.slice(0, 20).join('\n'));
     };
     rd.readAsText(file);
   }
@@ -2432,11 +2459,11 @@ document.addEventListener('click', e => {
       if (n.type === 'invite') { const L = S.groupLinks[n.key.split('|').slice(2, 4).join('|')]; if (L && L.invites[n.teamId] !== 'joined') L.invites[n.teamId] = 'sent'; } } });
       log('Messages marked sent', c); done(c + ' marked sent'); break; }
     case 'invite': { const L = S.groupLinks[el.dataset.k]; L.invites[el.dataset.t] = el.dataset.v; log('Invite ' + el.dataset.v, team(el.dataset.t).name); done(); break; }
-    case 'sendLogin': { const t = team(el.dataset.id); if (!confirm('Email a new password to ' + t.players[0].email + '?')) break;
+    case 'sendLogin': { const t = team(el.dataset.id); if (!confirmed(el, 'Email a new password to ' + t.players[0].email + '?')) break;
       Cloud.sendLogins([t.id]).then(n => { if (n) { delete loginNote[t.id]; toast('Login emailed to ' + t.players[0].email); } else { loginNote[t.id] = 'Not sent: email is not set up (Brevo key or sender missing)'; toast(loginNote[t.id]); } render(); }, err => { loginNote[t.id] = 'Not sent: ' + err.message; toast(err.message); render(); }); break; }
     case 'sendLoginsMissing': { const ids = S.teams.filter(t => t.status !== 'rejected' && !S.loginSent?.[t.id]).map(t => t.id);
       if (!ids.length) { toast('Every team already has its login'); break; }
-      if (!confirm('Email login passwords to ' + ids.length + ' captains? (Brevo free plan: 300 emails/day)')) break;
+      if (!confirmed(el, 'Email login passwords to ' + ids.length + ' captains? (Brevo free plan: 300 emails/day)')) break;
       Cloud.sendLogins(ids.slice(0, 300)).then(n => { toast(n + ' login emails queued'); render(); }, err => toast(err.message)); break; }
     case 'emailLog': Cloud.emailLog().then(rows => { emailLogRows = rows || []; render(); }, err => toast(err.message)); break;
     case 'emailLogClose': emailLogRows = null; render(); break;
@@ -2445,14 +2472,14 @@ document.addEventListener('click', e => {
     case 'adDot': { const box = el.closest('.ads'); if (box) adShow(box, Number(el.dataset.i)); break; }
     case 'adToggle': { const a = adsList()[+el.dataset.i]; if (!a) break; a.active = !a.active; log(a.active ? 'Ad shown' : 'Ad hidden', a.message.slice(0, 60)); done(a.active ? 'Ad is showing' : 'Ad hidden'); break; }
     case 'adMove': { const L = adsList().slice(), i = +el.dataset.i, j = i + Number(el.dataset.d); if (j < 0 || j >= L.length) break; [L[i], L[j]] = [L[j], L[i]]; S.settings.ads = L; done(); break; }
-    case 'adDel': { const a = adsList()[+el.dataset.i]; if (!a || !confirm('Delete this ad?')) break; S.settings.ads = adsList().filter(x => x !== a);
+    case 'adDel': { const a = adsList()[+el.dataset.i]; if (!a || !confirmed(el, 'Delete this ad?')) break; S.settings.ads = adsList().filter(x => x !== a);
       if (Cloud.on && a.kind === 'video' && !a.src.startsWith('data:')) Cloud.removeAd(a.src).catch(() => {});
       log('Ad deleted', (a.message || '').slice(0, 60)); done('Ad deleted'); break; }
     case 'tlogoRemove': e.preventDefault(); delete S.settings.logo; log('Tournament logo removed', ''); done('Logo removed'); break;
     case 'sameRoom': { const fm = findMatch(el.dataset.m), pm = prevRoom(fm.g, fm.m), f = el.closest('form'); if (pm) { f.roomId.value = pm.roomId; f.roomPass.value = pm.roomPass; toast('Filled from Match ' + pm.no + '. Click Release room to send it.'); } break; }
     case 'deleteTeam': { const t = team(el.dataset.id); if (!t) break;
       const inStage = S.stages.some(st => st.groups.some(g => g.teamIds.includes(t.id)));
-      if (!confirm(`Delete ${t.name} (${t.code || 'no ID'}) for good?${inStage ? '\nThis team is already in a group: it will be removed from its groups and results too.' : ''}\nThis cannot be undone.`)) break;
+      if (!confirmed(el, `Delete ${t.name} (${t.code || 'no ID'}) for good?${inStage ? '\nThis team is already in a group: it will be removed from its groups and results too.' : ''}\nThis cannot be undone.`)) break;
       S.stages.forEach(st => { st.groups.forEach(g => { g.teamIds = g.teamIds.filter(id => id !== t.id); g.matches.forEach(m => { if (m.results) delete m.results[t.id]; m.checkins = (m.checkins || []).filter(id => id !== t.id); }); });
         if (st.qualified) st.qualified = st.qualified.filter(id => id !== t.id); if (st.wcTray) st.wcTray = st.wcTray.filter(id => id !== t.id); });
       S.teams = S.teams.filter(x => x.id !== t.id); S.complaints = S.complaints.filter(c => c.teamId !== t.id); S.notifications = S.notifications.filter(n => n.teamId !== t.id);
@@ -2466,13 +2493,13 @@ document.addEventListener('click', e => {
     { const { m } = findMatch(el.dataset.m); if (!m.checkins.includes(el.dataset.t)) m.checkins.push(el.dataset.t); log('Checked in', team(el.dataset.t).name + ' ' + m.id); done('Checked in ✅'); break; }
     case 'demoTpl': {
       const t = E.TEMPLATES[el.dataset.k]; if (!t) break;
-      if (!confirm(`Replace ALL tournament data with a ${t.label} demo (stages played up to a live stage)? The bracket format becomes this template.`)) break;
+      if (!confirmed(el, `Replace ALL tournament data with a ${t.label} demo (stages played up to a live stage)? The bracket format becomes this template.`)) break;
       (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => { loadDemoTemplate(t.key); save(); toast(t.label + ' demo loaded'); location.hash = '#/admin/stages'; render(); }, err => toast(err.message));
       break;
     }
     case 'sample': case 'demoTour': {
       const tour = act === 'demoTour';
-      if (!confirm(tour ? 'Replace ALL tournament data with a demo tournament (264 teams, Stages 1–2 played, Stage 3 live)?' : 'Replace ALL tournament data with 252 sample teams + 12 Wild Cards? Registration stays open.')) break;
+      if (!confirmed(el, tour ? 'Replace ALL tournament data with a demo tournament (264 teams, Stages 1–2 played, Stage 3 live)?' : 'Replace ALL tournament data with 252 sample teams + 12 Wild Cards? Registration stays open.')) break;
       (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => {
         const keep = S.settings; loadSample(); if (Cloud.on) S.settings = keep;
         delete S.settings.template; delete S.settings.tplCounts;
@@ -2484,9 +2511,9 @@ document.addEventListener('click', e => {
       }, err => toast(err.message));
       break;
     }
-    case 'reset': if (confirm('Delete ALL teams, stages and results and start empty? Registration opens again.')) { (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => { const keep = S.settings; S = fresh(); if (Cloud.on) S.settings = keep; S.settings.regOpen = true; session.teamCode = null; log('Reset everything', 'registration open'); done('Reset: registration is open'); }, err => toast(err.message)); } break;
+    case 'reset': if (confirmed(el, 'Delete ALL teams, stages and results and start empty? Registration opens again.')) { (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => { const keep = S.settings; S = fresh(); if (Cloud.on) S.settings = keep; S.settings.regOpen = true; session.teamCode = null; log('Reset everything', 'registration open'); done('Reset: registration is open'); }, err => toast(err.message)); } break;
     case 'approve': { const t = team(el.dataset.id); if (t.status === 'rejected' && t.entry === 'SLOT') { if (usedSlots() >= S.settings.slots) { toast('No free slot'); return; } t.slotNo = freeSlotNo(); } t.status = 'approved'; t.reason = ''; notify(t.id, 'approved', '', approvedText(t)); log('Team approved', t.code + ' ' + t.name); done(); break; }
-    case 'reject': { const t = team(el.dataset.id); const why = prompt('Reason for rejecting ' + t.name + '?', 'Duplicate player'); if (why === null) return; t.status = 'rejected'; t.reason = why; t.slotNo = null; log('Team rejected', t.code + ' — ' + why); promoteWaitlist(); done(); break; }
+    case 'reject': { const t = team(el.dataset.id); const why = askText(el, 'Reason for rejecting ' + t.name + '?', 'Duplicate player'); if (why === null) return; t.status = 'rejected'; t.reason = why; t.slotNo = null; log('Team rejected', t.code + ' — ' + why); promoteWaitlist(); done(); break; }
     case 'approveAll': { const n = slotTeams().filter(t => t.status === 'pending').map(t => { t.status = 'approved'; notify(t.id, 'approved', '', approvedText(t)); }).length; log('Bulk approve', n + ' teams'); done(n + ' approved'); break; }
     case 'export': {
       const head = ['Team ID', 'Slot', 'Status', 'Entry', 'Team name', ...[1, 2, 3, 4].flatMap(i => ['P' + i + ' In Game Name', 'P' + i + ' Mobile', 'P' + i + ' Email', 'P' + i + ' UID'])];
@@ -2496,7 +2523,7 @@ document.addEventListener('click', e => {
       const csv = [head, ...rows].map(r => r.map(cell).join(',')).join('\n');
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'teams.csv'; a.click(); break;
     }
-    case 'wcRevoke': { const inv = S.wcInvites.find(i => i.token === el.dataset.token); if (!confirm('Cancel this invite link? It will stop working.')) break; inv.status = 'revoked'; log('Wild Card invite cancelled', inv.note || inv.token.slice(0, 6)); done('Invite cancelled'); break; }
+    case 'wcRevoke': { const inv = S.wcInvites.find(i => i.token === el.dataset.token); if (!confirmed(el, 'Cancel this invite link? It will stop working.')) break; inv.status = 'revoked'; log('Wild Card invite cancelled', inv.note || inv.token.slice(0, 6)); done('Invite cancelled'); break; }
     case 'removeWc': S.teams = S.teams.filter(t => t.id !== el.dataset.id); log('Wild Card removed', el.dataset.id); done(); break;
     case 'pathDel': {   // Settings: remove one stage; the ones after it are re-worked
       const form = el.closest('form'), k = Number(el.dataset.k);
@@ -2547,7 +2574,7 @@ document.addEventListener('click', e => {
     case 'approveAllResults': { S.stages.forEach(s => s.groups.forEach(g => { g.matches.forEach(m => { if (m.resultStatus === 'submitted') m.resultStatus = 'approved'; }); csSettle(s, g); })); log('Bulk result approve', ''); done('All approved'); break; }
     case 'openFix': openFix = openFix === el.dataset.k ? null : el.dataset.k; render(); break;
     case 'viewShot': { const box = document.createElement('div'); box.className = 'lightbox'; box.innerHTML = '<img alt="Screenshot">'; box.firstChild.src = el.src; box.addEventListener('click', () => box.remove()); document.body.appendChild(box); break; }
-    case 'resolve': { const c = S.complaints[el.dataset.i]; const ans = prompt('Reply to the team:', el.dataset.v === 'kept' ? 'Result checked, no change.' : 'Result corrected.'); if (ans === null) return; c.status = el.dataset.v; c.answer = ans; log('Complaint ' + c.status, c.matchLabel); done(); break; }
+    case 'resolve': { const c = S.complaints[el.dataset.i]; const ans = askText(el, 'Reply to the team:', el.dataset.v === 'kept' ? 'Result checked, no change.' : 'Result corrected.'); if (ans === null) return; c.status = el.dataset.v; c.answer = ans; log('Complaint ' + c.status, c.matchLabel); done(); break; }
     case 'mstatus': { const { m } = findMatch(el.dataset.m); m.status = el.dataset.s; log('Match ' + el.dataset.s, m.id); done(); break; }
     case 'checkinAll': { const { g, m } = findMatch(el.dataset.m); m.checkins = g.teamIds.slice(); done('All teams checked in'); break; }
     case 'randomFill': {

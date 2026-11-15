@@ -2,7 +2,9 @@
 // so every screen has something to show. Settings → "Load sample data" or "Reset everything" starts over.
 (function seedDemo() {
   if (Cloud.on || S.teams.length) return;   // never touches a live database or existing demo data
+  const keepAds = S.settings.ads;   // ads added in Admin → Ads survive the demo being filled again
   loadSample();
+  if (Array.isArray(keepAds)) S.settings.ads = keepAds;
   S.settings.prize = '₹50,000'; S.settings.organiser = 'DJ Esports';
   const thunder = S.teams.find(t => t.code === 'FF-0001').id;
   // Results that keep Team Thunder (the demo team) in the running.

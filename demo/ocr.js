@@ -315,7 +315,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.tagName === 'SELECT' || el.tagName === 'INPUT') return;
   const act = el.dataset.act; if (!act.startsWith('ocr') || !ocr) return;
   e.preventDefault();
-  if (act === 'ocrRun') { if (el.dataset.again && ocr.blocks && !confirm('Read the screenshots again from scratch? Your changes in the table will be replaced.')) return; return void ocrRun(false); }
+  if (act === 'ocrRun') { if (el.dataset.again && ocr.blocks && !confirmed(el, 'Read the screenshots again from scratch? Your changes in the table will be replaced.')) return; return void ocrRun(false); }
   if (act === 'ocrAdd') return void ocrRun(true);
   if (act === 'ocrPublish') return ocrPublish();
   if (act === 'ocrClear') { ocr.shots.forEach(s => s && URL.revokeObjectURL(s.url)); ocr = null; render(); return; }
@@ -323,7 +323,7 @@ document.addEventListener('click', e => {
   const b = ocr.blocks && ocr.blocks[+el.dataset.b];
   if (act === 'ocrDelP') b.players.splice(+el.dataset.p, 1);
   if (act === 'ocrAddP') b.players.push({ ocr: '', conf: 0, kills: 0, uid: null, exact: false, ok: false, sub: false, name: '' });
-  if (act === 'ocrDelB' && confirm('Remove rank ' + (b.rank || '?') + ' from this result?')) ocr.blocks.splice(+el.dataset.b, 1);
+  if (act === 'ocrDelB' && confirmed(el, 'Remove rank ' + (b.rank || '?') + ' from this result?')) ocr.blocks.splice(+el.dataset.b, 1);
   if (act === 'ocrAddB') { const usedR = new Set(ocr.blocks.map(x => x.rank)); let r = 1; while (usedR.has(r)) r++;
     ocr.blocks.push({ rank: r, shot: null, teamId: '', shortOk: false, players: [0, 1, 2, 3].map(() => ({ ocr: '', conf: 0, kills: 0, uid: null, exact: false, ok: false, sub: false, name: '' })) }); }
   render();
