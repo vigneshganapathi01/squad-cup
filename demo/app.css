@@ -1729,3 +1729,137 @@ select[data-act=ocrMatch]{min-width:260px}
 .ocr-table tbody.ocr-grp,.res-table tbody.res-grp{border-top-color:var(--glass-line)!important}
 .ocr-read{font-family:var(--display)!important}
 .dash-results h4{font-family:var(--display);text-transform:uppercase;letter-spacing:.06em}
+/* admin sidebar: remove the tournament logo/name/status block at the top */
+.side-brand{display:none!important}
+/* ===== Accessibility pass: readable contrast, minimum text sizes, calmer spacing, visible keyboard focus ===== */
+/* contrast: secondary text from 3.9:1 to ~6:1 on the navy panels (WCAG AA needs 4.5:1) */
+:root{--muted:#a3a8bb;--icon:#a3a8bb;--ink2:#c9ccdb}
+.muted,.small.muted,.foot,th,.kpis span,.kcard span,.th-stats span,.side-h,.ptabs a,.tabs a{color:var(--muted)}
+.rail a,.mainnav a{color:var(--icon)}
+/* minimum sizes: body 15px, small text 13px, tiny caps labels 12px */
+body{font-size:15px;line-height:1.6}
+.small,small,.muted.small,.mcard .small,.foot,.th-org,.kpis span,.th-stats span,.kcard span,.badge{font-size:13px!important}
+th,.side-h,.eyebrow,.groupcard h3 .muted,.ptsgrid span,.cd span,.lb-caret,.b-wc,.groupcard li:before{font-size:12px!important}
+.ptabs a,.tabs a{font-size:14px!important}
+.side a{font-size:15px}
+p,li,.card p{line-height:1.6}
+/* spacing: more room between sections and inside cards */
+.page-body>h2,#app h2{margin:34px 0 16px!important}
+#app .th + * h2:first-child{margin-top:8px!important}
+.card,.glass,.kcard,.groupcard ol,.prize-card{padding:20px!important}
+.groupcard{padding:0!important}
+.groupcard ol{padding:10px 12px 12px!important}
+.grid,.grid.g2,.grid.g3,.grid.g4,.kgrid,.dgrid{gap:18px!important}
+.th-stats{gap:14px!important;margin-top:24px!important}
+.ptabs{margin:22px 0 8px!important}
+.mcard{padding:18px!important}
+.mcard .mtitle{margin:8px 0 4px}
+.mcard .avs{margin-top:12px}
+.card.lb tbody td{height:52px}
+.side a{padding:10px 14px!important;margin:2px 0}
+.side-h{margin-top:14px}
+.foot{padding:14px 20px!important;line-height:1.5}
+/* readable line lengths for long text blocks */
+.card p,.notice,.ok,.errors{max-width:72ch}
+/* tap targets */
+.btn{min-height:40px}
+.btn.small{min-height:34px}
+/* keyboard focus: a clear ring on everything focusable (mouse clicks stay clean) */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent-2)!important;outline-offset:2px!important;border-radius:4px}
+.rail a:focus-visible,.side a:focus-visible,.ptabs a:focus-visible{outline-offset:-2px!important}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent)!important;outline-offset:0!important}
+/* links inside text are underlined so they don't rely on colour alone */
+.card p a,.notice a,.ok a,.small a{text-decoration:underline;text-underline-offset:2px}
+/* accent-coloured TEXT uses the lighter accent so it passes 4.5:1 (solid accent stays for fills/buttons) */
+:root{--accent-text:#a99dff}
+html[data-theme="dj"]{--accent-text:#6cf27a}
+html[data-theme="yellow"]{--accent-text:#ffd060}
+.eyebrow,.prow b,.ocr-reg.ok,a.small,.guide,.dash-results a{color:var(--accent-text)!important}
+.prow b{font-weight:500}
+/* ===== Registration as a pop-up (#/register): dim backdrop + centred dialog; the form itself is unchanged ===== */
+html.reg-popup .reg-backdrop{position:fixed;inset:0;z-index:90;background:rgba(6,7,16,.72);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);animation:reg-fade .18s ease-out}
+html.reg-popup .reg>.card{position:fixed!important;z-index:91;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow-y:auto;overscroll-behavior:contain;
+  margin:0!important;padding:28px 28px 24px!important;border-radius:14px!important;
+  background:#1e2235!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  border:1px solid rgba(var(--acc-rgb),.35)!important;box-shadow:0 30px 90px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06)!important;
+  animation:reg-pop .22s cubic-bezier(.2,.9,.3,1.2)}
+html.reg-popup .reg>.card::-webkit-scrollbar{width:8px}
+html.reg-popup .reg>.card::-webkit-scrollbar-thumb{background:rgba(var(--acc-rgb),.5);border-radius:6px}
+.reg-close{position:absolute;top:14px;right:14px;width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--glass-line);border-radius:8px;
+  background:rgba(255,255,255,.04);color:var(--ink);font:400 24px/1 var(--display);cursor:pointer}
+.reg-close:hover{background:rgba(var(--acc-rgb),.18);border-color:rgba(var(--acc-rgb),.6)}
+@keyframes reg-fade{from{opacity:0}}
+@keyframes reg-pop{from{opacity:0;transform:translate(-50%,-46%) scale(.97)}}
+@media(prefers-reduced-motion:reduce){html.reg-popup .reg>.card,html.reg-popup .reg-backdrop{animation:none}}
+@media(max-width:700px){html.reg-popup .reg>.card{padding:22px 16px 18px!important;max-height:calc(100vh - 90px);top:calc(50% - 30px)}}
+/* ===== Admin sidebar: cleaner rhythm — compact rows, quiet section labels, soft active state, tidy badges ===== */
+.side{padding:12px 10px 10px!important;gap:0!important;border-radius:12px!important}
+.side-h{font:500 11px/1 var(--display)!important;letter-spacing:.14em!important;text-transform:uppercase;color:var(--muted)!important;padding:18px 12px 8px!important;margin:0!important}
+.side-h:first-of-type{padding-top:6px!important}
+.side a{display:flex;align-items:center;gap:12px;min-height:38px;padding:8px 12px!important;margin:1px 0!important;border-radius:8px!important;
+  font:500 14px/1.2 var(--display)!important;letter-spacing:.02em!important;color:var(--ink2)!important;background:transparent!important;box-shadow:none!important}
+.side a svg{width:18px;height:18px;flex:none;fill:currentColor;opacity:.75}
+.side a:hover{background:rgba(255,255,255,.045)!important;color:#fff!important}
+.side a:hover svg{opacity:1}
+.side a.on,html[data-theme] .side a.on{background:rgba(var(--acc-rgb),.16)!important;color:#fff!important;box-shadow:inset 3px 0 0 var(--accent)!important}
+.side a.on svg,html[data-theme] .side a.on svg{fill:var(--accent-text)!important;opacity:1}
+.side a em{margin-left:auto;font:500 11px/1 var(--display);font-style:normal;min-width:20px;height:20px;padding:0 6px;border-radius:10px;
+  display:inline-grid;place-items:center;background:#e5484d;color:#fff}
+.side-foot{margin-top:12px!important;padding:14px 12px 4px!important;border-top:1px solid var(--glass-line);display:grid;gap:4px}
+.side-foot a{min-height:0;padding:0!important;margin:0!important;color:var(--accent-text)!important;background:none!important;font:500 14px var(--display)!important}
+.side-foot a:hover{text-decoration:underline;background:none!important}
+.side-foot .small{font-size:12px!important;color:var(--muted)}
+/* ===== Before the tournament starts (html.pre-start = no stages yet): show only what matters for registration ===== */
+/* overview: no Slots card (slots already in the hero stats), no empty Matches block, no empty Top performers column */
+html.pre-start .grid.ov{grid-template-columns:minmax(0,1fr)!important}
+html.pre-start .grid.ov>div:last-child{display:none!important}
+html.pre-start .grid.ov>div:first-child .grid.g2>.card:nth-child(2){display:none!important}
+html.pre-start .grid.ov>div:first-child .grid.g2{grid-template-columns:minmax(0,560px)!important}
+html.pre-start .grid.ov>div:first-child>h2:nth-of-type(2),
+html.pre-start .grid.ov>div:first-child>p.muted{display:none!important}
+/* sidebar: hide pages that have nothing to show yet */
+html.pre-start .rail a[data-r="groups"],html.pre-start .rail a[data-r="schedule"],
+html.pre-start .rail a[data-r="leaderboard"],html.pre-start .rail a[data-r="bracket"]{display:none!important}
+/* ===== Countdown: full width, centred, split-flap tiles that flip when a number changes ===== */
+html.pre-start .grid.ov>div:first-child .grid.g2{grid-template-columns:minmax(0,1fr)!important}
+.cd{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important;margin:14px 0 10px!important;perspective:600px}
+.cd>div{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:18px 8px 14px!important;
+  background:linear-gradient(180deg,#2a2f45 0,#262a3e 50%,#1f2336 50%,#1c2032 100%)!important;border:1px solid var(--glass-line)!important;border-radius:10px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 8px 18px rgba(5,6,14,.35)!important;overflow:hidden}
+.cd>div::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 12px);height:1px;background:rgba(0,0,0,.45);box-shadow:0 1px 0 rgba(255,255,255,.04)}
+.cd b{display:block;font:500 clamp(34px,4.2vw,54px)/1 var(--display)!important;color:#fff!important;font-variant-numeric:tabular-nums;letter-spacing:.02em;transform-origin:50% 60%}
+.cd b.flip{animation:cd-flip .5s cubic-bezier(.3,.7,.3,1)}
+@keyframes cd-flip{0%{transform:rotateX(-90deg);opacity:.2}60%{transform:rotateX(12deg);opacity:1}100%{transform:rotateX(0)}}
+.cd span{font:500 12px/1 var(--display)!important;letter-spacing:.14em!important;text-transform:uppercase;color:var(--muted)!important}
+html.pre-start .grid.ov>div:first-child .grid.g2>.card:first-child{text-align:center}
+html.pre-start .grid.ov>div:first-child .grid.g2>.card:first-child .eyebrow{justify-content:center}
+@media(prefers-reduced-motion:reduce){.cd b.flip{animation:none}}
+@media(max-width:560px){.cd{gap:8px!important}.cd>div{padding:12px 4px 10px!important}}
+/* ===== Promo slot under the countdown ===== */
+.card.promo{margin-top:18px;padding:18px 20px 20px!important}
+.promo-tag{font:500 11px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border:1px solid var(--glass-line);border-radius:4px;padding:4px 7px}
+.promo-frame{position:relative;margin-top:12px;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0d0f1b;border:1px solid var(--glass-line)}
+.promo-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+/* ===== Admin sidebar active item: gaming-platform style (accent gradient, glowing edge, angled cut, stripes) ===== */
+.side a.on,html[data-theme] .side a.on{position:relative;color:#fff!important;font-weight:500!important;letter-spacing:.06em!important;text-transform:uppercase;
+  background:linear-gradient(90deg,rgba(var(--acc-rgb),.55) 0%,rgba(var(--acc-rgb),.22) 55%,rgba(var(--acc-rgb),.06) 100%)!important;
+  box-shadow:inset 3px 0 0 var(--accent-2),0 0 18px rgba(var(--acc-rgb),.28)!important;
+  clip-path:polygon(0 0,100% 0,calc(100% - 12px) 100%,0 100%);border-radius:6px 0 0 6px!important}
+.side a.on::after{content:"";position:absolute;right:20px;top:50%;width:16px;height:12px;transform:translateY(-50%);
+  background:linear-gradient(115deg,transparent 0 30%,rgba(255,255,255,.75) 30% 46%,transparent 46% 58%,rgba(255,255,255,.4) 58% 74%,transparent 74%)}
+.side a.on svg,html[data-theme] .side a.on svg{fill:#fff!important;filter:drop-shadow(0 0 6px rgba(var(--acc-rgb),.8))}
+.side a.on em{margin-right:28px}
+/* ===== Admin sidebar: stays in view and scrolls on its own when the menu is taller than the window ===== */
+@media(min-width:901px){
+  .side{position:sticky!important;top:0!important;max-height:calc(100vh - 230px);overflow-y:auto;overscroll-behavior:contain;
+    scrollbar-width:thin;scrollbar-color:rgba(var(--acc-rgb),.55) transparent}
+  .side::-webkit-scrollbar{width:6px}
+  .side::-webkit-scrollbar-thumb{background:rgba(var(--acc-rgb),.5);border-radius:6px}
+  .side::-webkit-scrollbar-track{background:transparent}
+  /* soft fade at the bottom edge hints there is more to scroll */
+  .side{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 18px),transparent)}
+  .side-foot{padding-bottom:14px!important}
+}
