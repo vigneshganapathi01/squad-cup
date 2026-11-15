@@ -6,7 +6,7 @@
       <path d="M-10 510L366 138H466L612-8"/>
       <path d="M1290-6L1137 142H945L640 446"/>
     </g>
-    <use href="#l" stroke="rgba(8,10,20,.5)"/>
-    <use href="#l" stroke="rgba(255,255,255,.05)" transform="translate(0 -1.5)"/>
+    <use href="#l" stroke="rgba(8,10,20,.1)"/>
+    <use href="#l" stroke="rgba(255,255,255,.01)" transform="translate(0 -1.5)"/>
   </g>
 </svg>

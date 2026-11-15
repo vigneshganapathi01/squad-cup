@@ -1286,7 +1286,7 @@ h1,h2,.hero-title,.groupcard h3{letter-spacing:.03em!important}
 /* ===== Frame surface: navy panel with the angular line texture (reference), art faintly showing through the top ===== */
 .frame{background:#1e2235!important}
 .frame:before{content:""!important;position:absolute;inset:0!important;height:auto!important;opacity:1!important;z-index:-1;pointer-events:none;
-  background:url(art/lines-tl.svg) 0 0/max(1600px,100%) auto no-repeat,url(art/lines-br.svg) 100% 100%/1600px auto no-repeat,linear-gradient(180deg,#363a4b 0,#2b2f43 280px,#20253a 620px,#1e2235 900px,#1c2033 100%);
+  background:url(art/lines-tl.svg?v=3) 0 0/max(1600px,100%) auto no-repeat,url(art/lines-br.svg?v=3) 100% 100%/1600px auto no-repeat,linear-gradient(180deg,#363a4b 0,#2b2f43 280px,#20253a 620px,#1e2235 900px,#1c2033 100%);
   -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.86) 0,rgba(0,0,0,.94) 200px,#000 340px);mask-image:linear-gradient(180deg,rgba(0,0,0,.86) 0,rgba(0,0,0,.94) 200px,#000 340px)}
 .frame{background:transparent!important}
 .frame>.top,.frame>.rail{background:rgba(30,34,53,.25)!important}
@@ -1705,6 +1705,290 @@ select[data-act=ocrMatch]{min-width:260px}
 .path-row { box-sizing: border-box; grid-template-columns: minmax(58px, 1fr) 80px 56px 28px; gap: 4px 8px; } .path-row > b { white-space: nowrap; font-size: 12px; } .path-row input { padding-left: 8px; padding-right: 4px; }
 .path-row { grid-template-columns: minmax(84px, 1fr) 70px 50px 28px; } .path-row .sn input { font-weight: 600; padding-left: 8px; padding-right: 4px; } .path-row .sn input::placeholder { color: var(--ink, #eee); opacity: .75; }
 .ocr-exact { margin-top: 4px; font-weight: 600; color: var(--ink, #eee); font-size: 13px; word-break: break-word; }
+/* ===== Map cards: blend the text side with the page navy (no pure black), subtle dark wash over the map side ===== */
+.mcard[data-map="alpine"]::before{background-image:
+  linear-gradient(90deg,rgba(30,34,53,.97) 0%,rgba(30,34,53,.92) 30%,rgba(30,34,53,.6) 50%,rgba(30,34,53,.18) 70%,rgba(30,34,53,.08) 100%),
+  linear-gradient(90deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.28) 100%),
+  url(art/maps/alpine.webp)!important;background-size:auto,auto,cover!important;background-position:0 0,0 0,right center!important}
+.mcard.is-live[data-map]::before{box-shadow:none!important}
+.mcard.is-live{background:linear-gradient(#1e2235,#1e2235) padding-box,
+    conic-gradient(from var(--live-ang),rgba(255,255,255,.10) 0deg,rgba(255,255,255,.10) 230deg,rgba(255,255,255,.55) 290deg,#fff 330deg,rgba(255,255,255,.10) 360deg) border-box!important}
+.mcard{box-shadow:inset 0 1px 0 var(--glass-hi),0 8px 22px rgba(10,12,24,.28)!important}
+/* ===== Prize pool card (right column): gold chip on its own line, link underneath ===== */
+.prize-card .prize{display:block!important;width:fit-content!important;max-width:100%}
+.prize-card a.small{display:inline-block;margin-top:2px}
+/* ===== New screens from main (OCR upload, dashboard results, stage editor) brought into the theme ===== */
+.path-row{background:rgba(255,255,255,.02);border-color:var(--glass-line)!important;border-radius:6px}
+.path-row.final,.wc-opt{border-color:rgba(var(--acc-rgb),.45)!important}
+.wc-opt{background:rgba(var(--acc-rgb),.05)}
+.ocr-slot{background:rgba(13,15,27,.35)!important;border-color:var(--glass-line)!important;border-radius:8px}
+.ocr-slot:hover,.ocr-slot.has{border-color:rgba(var(--acc-rgb),.6)!important}
+.ocr-ph{background:rgba(13,15,27,.55)!important;border-radius:6px;color:var(--muted)}
+.ocr-slot img,.ocr-crop{background:#0d0f1b!important}
+.ocr-table td.ocr-tcell{background:rgba(45,50,69,.55)!important}
+.ocr-table tbody.ocr-grp,.res-table tbody.res-grp{border-top-color:var(--glass-line)!important}
+.ocr-read{font-family:var(--display)!important}
+.dash-results h4{font-family:var(--display);text-transform:uppercase;letter-spacing:.06em}
+/* admin sidebar: remove the tournament logo/name/status block at the top */
+.side-brand{display:none!important}
+/* ===== Accessibility pass: readable contrast, minimum text sizes, calmer spacing, visible keyboard focus ===== */
+/* contrast: secondary text from 3.9:1 to ~6:1 on the navy panels (WCAG AA needs 4.5:1) */
+:root{--muted:#a3a8bb;--icon:#a3a8bb;--ink2:#c9ccdb}
+.muted,.small.muted,.foot,th,.kpis span,.kcard span,.th-stats span,.side-h,.ptabs a,.tabs a{color:var(--muted)}
+.rail a,.mainnav a{color:var(--icon)}
+/* minimum sizes: body 15px, small text 13px, tiny caps labels 12px */
+body{font-size:15px;line-height:1.6}
+.small,small,.muted.small,.mcard .small,.foot,.th-org,.kpis span,.th-stats span,.kcard span,.badge{font-size:13px!important}
+th,.side-h,.eyebrow,.groupcard h3 .muted,.ptsgrid span,.cd span,.lb-caret,.b-wc,.groupcard li:before{font-size:12px!important}
+.ptabs a,.tabs a{font-size:14px!important}
+.side a{font-size:15px}
+p,li,.card p{line-height:1.6}
+/* spacing: more room between sections and inside cards */
+.page-body>h2,#app h2{margin:34px 0 16px!important}
+#app .th + * h2:first-child{margin-top:8px!important}
+.card,.glass,.kcard,.groupcard ol,.prize-card{padding:20px!important}
+.groupcard{padding:0!important}
+.groupcard ol{padding:10px 12px 12px!important}
+.grid,.grid.g2,.grid.g3,.grid.g4,.kgrid,.dgrid{gap:18px!important}
+.th-stats{gap:14px!important;margin-top:24px!important}
+.ptabs{margin:22px 0 8px!important}
+.mcard{padding:18px!important}
+.mcard .mtitle{margin:8px 0 4px}
+.mcard .avs{margin-top:12px}
+.card.lb tbody td{height:52px}
+.side a{padding:10px 14px!important;margin:2px 0}
+.side-h{margin-top:14px}
+.foot{padding:14px 20px!important;line-height:1.5}
+/* readable line lengths for long text blocks */
+.card p,.notice,.ok,.errors{max-width:72ch}
+/* tap targets */
+.btn{min-height:40px}
+.btn.small{min-height:34px}
+/* keyboard focus: a clear ring on everything focusable (mouse clicks stay clean) */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--accent-2)!important;outline-offset:2px!important;border-radius:4px}
+.rail a:focus-visible,.side a:focus-visible,.ptabs a:focus-visible{outline-offset:-2px!important}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent)!important;outline-offset:0!important}
+/* links inside text are underlined so they don't rely on colour alone */
+.card p a,.notice a,.ok a,.small a{text-decoration:underline;text-underline-offset:2px}
+/* accent-coloured TEXT uses the lighter accent so it passes 4.5:1 (solid accent stays for fills/buttons) */
+:root{--accent-text:#a99dff}
+html[data-theme="dj"]{--accent-text:#6cf27a}
+html[data-theme="yellow"]{--accent-text:#ffd060}
+.eyebrow,.prow b,.ocr-reg.ok,a.small,.guide,.dash-results a{color:var(--accent-text)!important}
+.prow b{font-weight:500}
+/* ===== Registration as a pop-up (#/register): dim backdrop + centred dialog; the form itself is unchanged ===== */
+html.reg-popup .reg-backdrop{position:fixed;inset:0;z-index:90;background:rgba(6,7,16,.72);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);animation:reg-fade .18s ease-out}
+html.reg-popup .reg>.card{position:fixed!important;z-index:91;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow-y:auto;overscroll-behavior:contain;
+  margin:0!important;padding:28px 28px 24px!important;border-radius:14px!important;
+  background:#1e2235!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  border:1px solid rgba(var(--acc-rgb),.35)!important;box-shadow:0 30px 90px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06)!important;
+  animation:reg-pop .22s cubic-bezier(.2,.9,.3,1.2)}
+html.reg-popup .reg>.card::-webkit-scrollbar{width:8px}
+html.reg-popup .reg>.card::-webkit-scrollbar-thumb{background:rgba(var(--acc-rgb),.5);border-radius:6px}
+.reg-close{position:absolute;top:14px;right:14px;width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--glass-line);border-radius:8px;
+  background:rgba(255,255,255,.04);color:var(--ink);font:400 24px/1 var(--display);cursor:pointer}
+.reg-close:hover{background:rgba(var(--acc-rgb),.18);border-color:rgba(var(--acc-rgb),.6)}
+@keyframes reg-fade{from{opacity:0}}
+@keyframes reg-pop{from{opacity:0;transform:translate(-50%,-46%) scale(.97)}}
+@media(prefers-reduced-motion:reduce){html.reg-popup .reg>.card,html.reg-popup .reg-backdrop{animation:none}}
+@media(max-width:700px){html.reg-popup .reg>.card{padding:22px 16px 18px!important;max-height:calc(100vh - 90px);top:calc(50% - 30px)}}
+/* ===== Admin sidebar: cleaner rhythm — compact rows, quiet section labels, soft active state, tidy badges ===== */
+.side{padding:12px 10px 10px!important;gap:0!important;border-radius:12px!important}
+.side-h{font:500 11px/1 var(--display)!important;letter-spacing:.14em!important;text-transform:uppercase;color:var(--muted)!important;padding:18px 12px 8px!important;margin:0!important}
+.side-h:first-of-type{padding-top:6px!important}
+.side a{display:flex;align-items:center;gap:12px;min-height:38px;padding:8px 12px!important;margin:1px 0!important;border-radius:8px!important;
+  font:500 14px/1.2 var(--display)!important;letter-spacing:.02em!important;color:var(--ink2)!important;background:transparent!important;box-shadow:none!important}
+.side a svg{width:18px;height:18px;flex:none;fill:currentColor;opacity:.75}
+.side a:hover{background:rgba(255,255,255,.045)!important;color:#fff!important}
+.side a:hover svg{opacity:1}
+.side a.on,html[data-theme] .side a.on{background:rgba(var(--acc-rgb),.16)!important;color:#fff!important;box-shadow:inset 3px 0 0 var(--accent)!important}
+.side a.on svg,html[data-theme] .side a.on svg{fill:var(--accent-text)!important;opacity:1}
+.side a em{margin-left:auto;font:500 11px/1 var(--display);font-style:normal;min-width:20px;height:20px;padding:0 6px;border-radius:10px;
+  display:inline-grid;place-items:center;background:#e5484d;color:#fff}
+.side-foot{margin-top:12px!important;padding:14px 12px 4px!important;border-top:1px solid var(--glass-line);display:grid;gap:4px}
+.side-foot a{min-height:0;padding:0!important;margin:0!important;color:var(--accent-text)!important;background:none!important;font:500 14px var(--display)!important}
+.side-foot a:hover{text-decoration:underline;background:none!important}
+.side-foot .small{font-size:12px!important;color:var(--muted)}
+/* ===== Before the tournament starts (html.pre-start = no stages yet): show only what matters for registration ===== */
+/* overview: no Slots card (slots already in the hero stats), no empty Matches block, no empty Top performers column */
+html.pre-start .grid.ov{grid-template-columns:minmax(0,1fr)!important}
+html.pre-start .grid.ov>div:last-child{display:none!important}
+html.pre-start .grid.ov>div:first-child .grid.g2>.card:nth-child(2){display:none!important}
+html.pre-start .grid.ov>div:first-child .grid.g2{grid-template-columns:minmax(0,560px)!important}
+html.pre-start .grid.ov>div:first-child>h2:nth-of-type(2),
+html.pre-start .grid.ov>div:first-child>p.muted{display:none!important}
+/* sidebar: hide pages that have nothing to show yet */
+html.pre-start .rail a[data-r="groups"],html.pre-start .rail a[data-r="schedule"],
+html.pre-start .rail a[data-r="leaderboard"],html.pre-start .rail a[data-r="bracket"]{display:none!important}
+/* ===== Countdown: full width, centred, split-flap tiles that flip when a number changes ===== */
+html.pre-start .grid.ov>div:first-child .grid.g2{grid-template-columns:minmax(0,1fr)!important}
+.cd{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important;margin:14px 0 10px!important;perspective:600px}
+.cd>div{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:18px 8px 14px!important;
+  background:linear-gradient(180deg,#2a2f45 0,#262a3e 50%,#1f2336 50%,#1c2032 100%)!important;border:1px solid var(--glass-line)!important;border-radius:10px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 8px 18px rgba(5,6,14,.35)!important;overflow:hidden}
+.cd>div::after{content:"";position:absolute;left:0;right:0;top:calc(50% - 12px);height:1px;background:rgba(0,0,0,.45);box-shadow:0 1px 0 rgba(255,255,255,.04)}
+.cd b{display:block;font:500 clamp(34px,4.2vw,54px)/1 var(--display)!important;color:#fff!important;font-variant-numeric:tabular-nums;letter-spacing:.02em;transform-origin:50% 60%}
+.cd b.flip{animation:cd-flip .5s cubic-bezier(.3,.7,.3,1)}
+@keyframes cd-flip{0%{transform:rotateX(-90deg);opacity:.2}60%{transform:rotateX(12deg);opacity:1}100%{transform:rotateX(0)}}
+.cd span{font:500 12px/1 var(--display)!important;letter-spacing:.14em!important;text-transform:uppercase;color:var(--muted)!important}
+html.pre-start .grid.ov>div:first-child .grid.g2>.card:first-child{text-align:center}
+html.pre-start .grid.ov>div:first-child .grid.g2>.card:first-child .eyebrow{justify-content:center}
+@media(prefers-reduced-motion:reduce){.cd b.flip{animation:none}}
+@media(max-width:560px){.cd{gap:8px!important}.cd>div{padding:12px 4px 10px!important}}
+/* ===== Promo slot under the countdown ===== */
+.card.promo{margin-top:18px;padding:18px 20px 20px!important}
+.promo-tag{font:500 11px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border:1px solid var(--glass-line);border-radius:4px;padding:4px 7px}
+.promo-frame{position:relative;margin-top:12px;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0d0f1b;border:1px solid var(--glass-line)}
+.promo-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+/* ===== Admin sidebar active item: gaming-platform style (accent gradient, glowing edge, angled cut, stripes) ===== */
+.side a.on,html[data-theme] .side a.on{position:relative;color:#fff!important;font-weight:500!important;letter-spacing:.06em!important;text-transform:uppercase;
+  background:linear-gradient(90deg,rgba(var(--acc-rgb),.55) 0%,rgba(var(--acc-rgb),.22) 55%,rgba(var(--acc-rgb),.06) 100%)!important;
+  box-shadow:inset 3px 0 0 var(--accent-2),0 0 18px rgba(var(--acc-rgb),.28)!important;
+  clip-path:polygon(0 0,100% 0,calc(100% - 12px) 100%,0 100%);border-radius:6px 0 0 6px!important}
+.side a.on::after{content:"";position:absolute;right:20px;top:50%;width:16px;height:12px;transform:translateY(-50%);
+  background:linear-gradient(115deg,transparent 0 30%,rgba(255,255,255,.75) 30% 46%,transparent 46% 58%,rgba(255,255,255,.4) 58% 74%,transparent 74%)}
+.side a.on svg,html[data-theme] .side a.on svg{fill:#fff!important;filter:drop-shadow(0 0 6px rgba(var(--acc-rgb),.8))}
+.side a.on em{margin-right:28px}
+/* ===== Admin sidebar: sticky, full height (top of the greeting to the bottom of the frame).
+   Rows share the height: roomy on tall screens, compact (and scrollable) on short ones.
+   --side-h is set by ui.js from the scroll frame's inner height. ===== */
+@media(min-width:901px){
+  .side{position:sticky!important;top:0!important;align-self:start;height:var(--side-h,calc(100vh - 200px));max-height:none!important;
+    overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(var(--acc-rgb),.5) transparent;
+    padding:14px 12px 12px!important;-webkit-mask-image:none!important;mask-image:none!important}
+  .side::-webkit-scrollbar{width:6px}
+  .side::-webkit-scrollbar-thumb{background:rgba(var(--acc-rgb),.5);border-radius:6px}
+  .side a{flex:1 0 auto;min-height:42px!important;max-height:52px;margin:3px 0!important}
+  .side-h{flex:none;padding:20px 12px 8px!important}
+  .side-h:first-of-type{padding-top:4px!important}
+  .side-foot{flex:none;margin-top:auto!important;padding-top:12px!important;padding-bottom:4px!important}
+}
+/* ===== Hero countdown: before the start, ui.js moves the countdown into the stats row
+   (Prize | Slots | Starts in), so the promo below the tabs is visible without scrolling ===== */
+.th-stats.has-cd>div:nth-child(3),.th-stats.has-cd>div:nth-child(4){display:none!important}
+.th-stats>.th-cd{grid-column:span 2;display:flex!important;align-items:center;gap:18px;padding:10px 12px 10px 18px!important}
+.th-stats .th-cd-l{display:flex!important;flex-direction:column;gap:7px;flex:none;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
+.th-stats .th-cd-l b{font:500 14px/1 var(--display)!important;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink-soft)!important}
+.th-stats .th-cd-l span{font-size:12.5px!important;letter-spacing:.04em!important;text-transform:none!important}
+.th-stats .th-cd .cd{flex:1;min-width:0;margin:0!important;gap:8px!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
+.th-stats .th-cd .cd>div{display:flex!important;padding:9px 4px 8px!important;gap:6px!important;background:rgba(0,0,0,.38)!important;border:1px solid var(--glass-line)!important;border-radius:6px!important;box-shadow:none!important;backdrop-filter:none!important}
+.th-stats .th-cd .cd>div::after{top:calc(50% - 9px)}
+.th-stats .th-cd .cd b{font-size:28px!important;line-height:1!important}
+.th-stats .th-cd .cd span{font-size:10.5px!important;letter-spacing:.12em!important}
+html.hero-cd .grid.ov>div:first-child>h2:first-of-type,html.hero-cd .grid.ov>div:first-child>.grid.g2{display:none!important}
+html.hero-cd .card.promo{margin-top:0}
+@media(max-width:700px){.th-stats>.th-cd{flex-direction:column;align-items:stretch;gap:10px;padding:12px!important}.th-stats .th-cd-l{flex-direction:row;justify-content:space-between;align-items:baseline}}
+@media(max-width:560px){.th-stats>div:not(.th-cd) b{font-size:20px!important}.th-stats>div:first-child b{font-size:19px!important}}
+/* ===== Admin dashboard banner: Free Fire character (official render, ff.garena.com) over a violet lightning bolt ===== */
+.dash-head{--cx:max(250px,calc(36% - 80px));position:relative;isolation:isolate;overflow:hidden;align-items:center!important;min-height:150px;padding:24px 28px!important;margin-bottom:20px!important;
+  border-radius:12px;border:1px solid var(--glass-line);
+  background:radial-gradient(60% 130% at 40% 50%,rgba(var(--acc-rgb),.26),transparent 70%),
+    repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 14px),
+    linear-gradient(90deg,#121327 0%,#1a1b36 50%,#121327 100%)}
+.dash-head::before{content:"";position:absolute;z-index:-2;left:calc(var(--cx) + 95px);top:-14%;width:220px;height:128%;
+  background:linear-gradient(165deg,#b9adff 0%,var(--accent) 45%,rgba(var(--acc-rgb),.35) 100%);
+  clip-path:polygon(56% 0,100% 0,66% 42%,90% 42%,24% 100%,42% 55%,16% 55%);opacity:.9}
+.dash-head::after{content:"";position:absolute;z-index:-1;left:var(--cx);top:-4px;width:240px;height:240px;
+  background:url(art/ff-banner-char.webp) center top/contain no-repeat;
+  filter:drop-shadow(0 0 18px rgba(var(--acc-rgb),.45));
+  -webkit-mask-image:linear-gradient(180deg,#000 52%,transparent 66%);mask-image:linear-gradient(180deg,#000 52%,transparent 66%)}
+.dash-head>*{position:relative;z-index:1}
+.dash-head h1{margin:2px 0 4px!important}
+.dash-head .row{gap:12px}
+@media(max-width:1100px){.dash-head{--cx:calc(100% - 560px)}}
+@media(max-width:760px){.dash-head{min-height:0}.dash-head::before{right:-30px;opacity:.35}.dash-head::after{display:none}}
+/* phones/tablets: the admin menu is one horizontal row; keep its items at their natural height */
+@media(max-width:900px){.side{align-items:center!important;height:auto!important;min-height:0!important;max-height:none!important}.side a{flex:none!important;height:auto!important;white-space:nowrap}.side a.on::after{display:none}.side a.on em{margin-right:0}}
+/* ===== Before the start: overview layout under the tabs (owner's sketch) — built by ui.js ===== */
+.ov-pre{display:grid;gap:18px}
+.ov-row{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:18px}
+.ov-card{padding:22px 24px!important;margin:0!important}
+.ov-h{display:flex;align-items:center;gap:10px;margin:0 0 14px!important;font:500 15px/1.2 var(--display)!important;letter-spacing:.1em;text-transform:uppercase}
+.ov-h::before{content:"";width:3px;height:16px;border-radius:2px;background:var(--accent)}
+.ov-lead{margin:0 0 18px;color:var(--ink-2,#c9cbe0);line-height:1.6;max-width:62ch}
+.ov-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin:0 0 18px;border:1px solid var(--glass-line);border-radius:10px;overflow:hidden;background:var(--glass-line)}
+.ov-facts div{padding:12px 14px;background:rgba(14,15,30,.72)}
+.ov-facts dt{font:500 11.5px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.ov-facts dd{margin:0;font:500 15px/1.3 var(--display);color:#fff}
+.ov-links{display:flex;gap:10px;flex-wrap:wrap}
+.ov-org{display:flex;flex-direction:column}
+.ov-org-main{display:flex;align-items:center;gap:14px;padding:14px;border-radius:10px;background:rgba(var(--acc-rgb),.1);border:1px solid rgba(var(--acc-rgb),.28)}
+.ov-org-main img{width:58px;height:58px;object-fit:contain;flex:none}
+.ov-org-main span{display:block;font-size:12px;color:var(--muted);letter-spacing:.04em}
+.ov-org-main b{display:block;font:500 18px/1.25 var(--display);color:#fff;margin-top:3px}
+.ov-sub{margin:18px 0 10px;font:500 11.5px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ov-sponsors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ov-slot{display:grid;place-items:center;min-height:64px;padding:8px;border:1px dashed rgba(255,255,255,.18);border-radius:8px;font-size:12px;color:var(--muted);text-align:center}
+.ov-note{margin:auto 0 0;padding-top:14px;font-size:13px;color:var(--muted)}
+.ov-about-in{display:flex;align-items:center;gap:18px}
+.ov-about-in img{width:72px;height:72px;object-fit:contain;flex:none}
+.ov-about-in p{margin:0;line-height:1.65;color:var(--ink-2,#c9cbe0);max-width:90ch}
+.ov-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.ov-tags span{padding:6px 12px;border-radius:999px;border:1px solid var(--glass-line);font-size:12.5px;color:var(--ink-2,#c9cbe0);background:rgba(255,255,255,.03)}
+/* ad banner: wide 8:3 like a store hero banner, not 16:9 */
+.ov-ad{position:relative;display:flex;align-items:center;aspect-ratio:8/3;border-radius:14px;overflow:hidden;text-decoration:none!important;color:#fff!important;
+  border:1px solid var(--glass-line);background:#0b0c18;isolation:isolate}
+.ov-ad::after{content:"";position:absolute;z-index:-2;top:0;right:0;height:100%;aspect-ratio:1480/990;background:url(art/ad-ff.webp) center/cover no-repeat;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 38%);mask-image:linear-gradient(90deg,transparent 0,#000 38%)}
+.ov-ad::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(11,12,24,.6) 0%,rgba(11,12,24,.25) 45%,rgba(11,12,24,0) 65%),radial-gradient(60% 90% at 0% 100%,rgba(var(--acc-rgb),.25),transparent 70%)}
+.ov-ad-in{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:0 clamp(22px,5vw,64px);max-width:560px}
+.ov-ad-eb{font:500 12px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-text)}
+.ov-ad-t{font:500 clamp(28px,4vw,52px)/1.05 var(--display);letter-spacing:.01em}
+.ov-ad-s{font-size:clamp(14px,1.4vw,18px);color:rgba(255,255,255,.82)}
+.ov-ad-cta{margin-top:6px}
+.ov-ad:hover .ov-ad-cta{filter:brightness(1.12)}
+.ov-ad:focus-visible{outline:2px solid var(--accent-text);outline-offset:3px}
+.ov-ad-tag{position:absolute;top:14px;right:14px;font:500 11px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;padding:5px 8px;border-radius:4px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.8)}
+@media(max-width:900px){.ov-row{grid-template-columns:minmax(0,1fr)}.ov-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.ov-card{padding:18px!important}.ov-about-in{align-items:flex-start}.ov-about-in img{width:52px;height:52px}
+  .ov-ad{aspect-ratio:auto;min-height:220px}.ov-ad::after{width:100%;aspect-ratio:auto;-webkit-mask-image:none;mask-image:none;background-position:65% center}.ov-ad::before{background:linear-gradient(90deg,rgba(11,12,24,.95),rgba(11,12,24,.55))}}
+/* overview: left column stacks Tournament overview + Rules & Regulations; organiser card fills the right */
+.ov-left{display:grid;gap:18px;min-width:0}
+.ov-facts{margin-bottom:0!important}
+.ov-rules{padding:0!important;margin:0!important;overflow:hidden}
+.ov-rules-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 24px;border-bottom:1px solid var(--glass-line);background:rgba(0,0,0,.14)}
+.ov-rules-t{display:flex;align-items:center;gap:10px;font:500 14px/1 var(--display);letter-spacing:.06em;color:var(--accent-text)}
+.ov-rules-t svg{width:18px;height:18px;fill:currentColor}
+.ov-rules-k{font-size:13px;color:var(--muted)}
+.ov-rules-b{padding:20px 24px 22px}
+.ov-rules-b p{margin:0 0 16px;line-height:1.65;color:var(--ink-2,#c9cbe0);max-width:70ch}
+.ov-rules-btn{display:inline-flex!important;align-items:center;gap:10px}
+.ov-rules-btn svg{width:16px;height:16px;fill:currentColor}
+@media(max-width:560px){.ov-rules-h,.ov-rules-b{padding-left:18px;padding-right:18px}}
+.ov-org .ov-sponsors{flex:1;grid-template-columns:minmax(0,1fr);grid-auto-rows:minmax(56px,1fr)}
+.ov-org .ov-slot{min-height:56px}
+.ov-rules-btn{border:1px solid rgba(255,255,255,.2)!important;padding:12px 18px!important}
+.ov-rules-btn:hover{border-color:rgba(var(--acc-rgb),.6)!important}
+@media(max-width:900px){.ov-org .ov-sponsors{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:auto}}
+/* ===== Registered (success) screen: esports success badge instead of an emoji ===== */
+.reg-done{position:relative;overflow:hidden;padding:34px 30px 28px!important;border:1px solid rgba(var(--acc-rgb),.35)!important;
+  background:radial-gradient(70% 55% at 50% 0,rgba(var(--acc-rgb),.28),transparent 70%),linear-gradient(180deg,rgba(32,35,58,.96),rgba(22,24,40,.96))!important}
+.reg-done::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 16px);-webkit-mask-image:linear-gradient(180deg,#000,transparent 60%);mask-image:linear-gradient(180deg,#000,transparent 60%)}
+.reg-done>*{position:relative}
+.rd-badge{width:104px;height:104px;margin:0 auto 14px;filter:drop-shadow(0 0 22px rgba(var(--acc-rgb),.55));animation:rd-in .6s cubic-bezier(.2,.9,.3,1.2) both}
+.rd-badge svg{width:100%;height:100%;overflow:visible}
+.rd-hex{fill:rgba(var(--acc-rgb),.16);stroke:var(--accent);stroke-width:2.5}
+.rd-hex2{fill:var(--accent);stroke:rgba(255,255,255,.35);stroke-width:1}
+.rd-chk{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:square;stroke-linejoin:miter;stroke-dasharray:50;stroke-dashoffset:50;animation:rd-chk .45s .35s ease-out forwards}
+@keyframes rd-in{from{opacity:0;transform:scale(.6) rotate(-8deg)}to{opacity:1;transform:none}}
+@keyframes rd-chk{to{stroke-dashoffset:0}}
+.rd-eb{font:500 12.5px/1 var(--display);letter-spacing:.2em;text-transform:uppercase;color:var(--accent-text);margin-bottom:6px}
+.reg-done h1{margin:0 auto 12px!important;width:fit-content;font-size:clamp(30px,4vw,40px)!important;letter-spacing:.06em!important;text-transform:uppercase}
+.reg-done>p.muted{max-width:40ch;margin:0 auto 18px!important}
+.rd-id{display:flex;align-items:center;justify-content:center;gap:18px;margin:6px auto 14px;padding:14px 22px;width:fit-content;max-width:100%;
+  border:1px solid var(--glass-line);border-radius:10px;background:rgba(0,0,0,.28);
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+.rd-id-t{text-align:left}
+.rd-id-t span{display:block;font:500 11.5px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.rd-id .big-code{font-size:38px!important;line-height:1!important;color:#fff!important;letter-spacing:.08em!important}
+.reg-done .row{gap:10px;margin-top:6px}
+@media(prefers-reduced-motion:reduce){.rd-badge{animation:none}.rd-chk{animation:none;stroke-dashoffset:0}}
+@media(max-width:560px){.reg-done{padding:26px 18px 22px!important}.rd-id .big-code{font-size:30px!important}}
+
 /* roadmap templates: editor rows (Stage · Total · Qualified · MT) and the stage tabs on the Stages page */
 .tpl-ed .path-row { grid-template-columns: minmax(84px, 1fr) 72px 72px 52px; }
 .tpl-ed .path-row .sn input:disabled { opacity: 1; color: var(--ink); font-weight: 600; }
@@ -1721,13 +2005,15 @@ select[data-act=ocrMatch]{min-width:260px}
 .tpl-ed .tpl-wc { text-align: center; }
 .tpl-ed .tpl-wc.on { color: var(--accent); font-weight: 700; opacity: 1; border-color: var(--accent); }
 /* ads: banner on the landing page (one slide at a time) and the Admin → Ads page */
-.ads { position: relative; margin: 14px 0 4px; border-radius: 10px; overflow: hidden; background: #05060c; border: 1px solid var(--line); aspect-ratio: 16 / 5; min-height: 140px; }
+.ads { position: relative; margin: 14px 0 4px; border-radius: 14px; overflow: hidden; background: #05060c; border: 1px solid var(--line); aspect-ratio: 8 / 3; min-height: 160px; }
+.ads .ov-ad-tag { z-index: 2; }
+.ads.in-ov { margin: 0; }
 .ad-slide { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; pointer-events: none; }
 .ad-slide.on { opacity: 1; pointer-events: auto; }
 .ad-media { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ad-cap { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; background: linear-gradient(transparent, rgba(5, 6, 12, .85)); }
 .ad-cap p { margin: 0; color: #fff; font-weight: 600; font-size: 15px; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
-.ad-dots { position: absolute; right: 12px; top: 10px; display: flex; gap: 6px; }
+.ad-dots { position: absolute; left: 14px; top: 16px; z-index: 2; display: flex; gap: 6px; }
 .ad-dots button { width: 9px; height: 9px; padding: 0; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .45); cursor: pointer; }
 .ad-dots button.on { background: var(--accent); }
 @media (max-width: 700px) { .ads { aspect-ratio: 16 / 7; } .ad-cap { flex-direction: column; align-items: flex-start; padding: 10px 12px; } .ad-cap p { font-size: 13px; } }

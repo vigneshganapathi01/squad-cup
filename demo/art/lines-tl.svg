@@ -8,6 +8,6 @@
     <path d="M642 224L370 496"/>
     <path d="M1290-6L1137 142H945L640 446"/>
   </g>
-  <use href="#l" stroke="rgba(8,10,20,.55)"/>
-  <use href="#l" stroke="rgba(255,255,255,.07)" transform="translate(0 1.5)"/>
+  <use href="#l" stroke="rgba(8,10,20,.11)"/>
+  <use href="#l" stroke="rgba(255,255,255,.014)" transform="translate(0 1.5)"/>
 </svg>
