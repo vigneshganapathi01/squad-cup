@@ -5,25 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Squad Cup · Demo</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Cdefs%3E%3ClinearGradient id=%27g%27 x1=%270%27 y1=%270%27 x2=%271%27 y2=%271%27%3E%3Cstop offset=%270%27 stop-color=%27%23fde68a%27/%3E%3Cstop offset=%271%27 stop-color=%27%23b45309%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27url(%23g)%27/%3E%3Ctext x=%2732%27 y=%2742%27 font-family=%27Arial,sans-serif%27 font-size=%2726%27 font-weight=%27900%27 text-anchor=%27middle%27 fill=%27%23130b00%27%3ESC%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="art/dj-favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=20261116">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="ui.js?v=20261145"></script>
+<link rel="stylesheet" href="app.css?v=20261145">
 </head>
 <body>
+<div class="stage-art" aria-hidden="true"></div>
+<div class="frame">
 <header class="top">
-  <a class="brand" href="#/"><span class="logo">SC</span> <span id="brandName">Squad Cup</span></a>
-  <nav class="mainnav">
-    <a href="#/overview">Tournament</a><a href="#/leaderboard">Leaderboard</a><a href="#/my-team">My Team</a><a href="#/staff" class="staff">Staff</a>
-  </nav>
+  <a class="brand" href="#/"><span class="logo"><svg class="sc-mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M10 14 14 10H30L34 14V20H26V18H18V24H30L34 28V50L30 54H12L8 50V44H16V46H26V32H14L10 28Z"/><path d="M38 14 42 10H54L58 14V20H50V18H46V46H50V44H58V50L54 54H42L38 50Z"/></svg></span> <span id="brandName">Squad Cup</span></a>
+  <div class="top-title" id="topTitle">Tournament</div>
+  <a href="#/staff" class="staff">+ Staff</a>
 </header>
+<aside class="rail" aria-label="Sections">
+  <a href="#/register" data-r="register" title="Register" class="rail-reg"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M440-440H240q-17 0-28.5-11.5T200-480q0-17 11.5-28.5T240-520h200v-200q0-17 11.5-28.5T480-760q17 0 28.5 11.5T520-720v200h200q17 0 28.5 11.5T760-480q0 17-11.5 28.5T720-440H520v200q0 17-11.5 28.5T480-200q-17 0-28.5-11.5T440-240v-200Z"/></svg><span class="rail-lbl">Register</span></a>
+  <a href="#/overview" data-r="overview" title="Overview"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M160-200v-360q0-19 8.5-36t23.5-28l240-180q21-16 48-16t48 16l240 180q15 11 23.5 28t8.5 36v360q0 33-23.5 56.5T720-120H600q-17 0-28.5-11.5T560-160v-200q0-17-11.5-28.5T520-400h-80q-17 0-28.5 11.5T400-360v200q0 17-11.5 28.5T360-120H240q-33 0-56.5-23.5T160-200Z"/></svg><span class="rail-lbl">Overview</span></a>
+  <a href="#/groups" data-r="groups" title="Group Stage"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M40-272q0-34 17.5-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q29 15 46.5 43.5T680-272v32q0 33-23.5 56.5T600-160H120q-33 0-56.5-23.5T40-240v-32Zm698 112q11-18 16.5-38.5T760-240v-40q0-44-24.5-84.5T666-434q51 6 96 20.5t84 35.5q36 20 55 44.5t19 53.5v40q0 33-23.5 56.5T840-160H738ZM247-527q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47Zm466 0q-47 47-113 47-11 0-28-2.5t-28-5.5q27-32 41.5-71t14.5-81q0-42-14.5-81T544-792q14-5 28-6.5t28-1.5q66 0 113 47t47 113q0 66-47 113Z"/></svg><span class="rail-lbl">Group Stage</span></a>
+  <a href="#/schedule" data-r="schedule" title="Matches"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-40q0-17 11.5-28.5T280-880q17 0 28.5 11.5T320-840v40h320v-40q0-17 11.5-28.5T680-880q17 0 28.5 11.5T720-840v40h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm280-240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></svg><span class="rail-lbl">Matches</span></a>
+  <i></i>
+  <a href="#/leaderboard" data-r="leaderboard" title="Standings"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M280-528v-152h-80v40q0 38 22 68.5t58 43.5Zm400 0q36-13 58-43.5t22-68.5v-40h-80v152ZM440-200v-124q-49-11-87.5-41.5T296-442q-75-9-125.5-65.5T120-640v-40q0-33 23.5-56.5T200-760h80q0-33 23.5-56.5T360-840h240q33 0 56.5 23.5T680-760h80q33 0 56.5 23.5T840-680v40q0 76-50.5 132.5T664-442q-18 46-56.5 76.5T520-324v124h120q17 0 28.5 11.5T680-160q0 17-11.5 28.5T640-120H320q-17 0-28.5-11.5T280-160q0-17 11.5-28.5T320-200h120Z"/></svg><span class="rail-lbl">Standings</span></a>
+  <a href="#/bracket" data-r="bracket" title="Bracket"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M600-200v-40h-80q-33 0-56.5-23.5T440-320v-320h-80v40q0 33-23.5 56.5T280-520H160q-33 0-56.5-23.5T80-600v-160q0-33 23.5-56.5T160-840h120q33 0 56.5 23.5T360-760v40h240v-40q0-33 23.5-56.5T680-840h120q33 0 56.5 23.5T880-760v160q0 33-23.5 56.5T800-520H680q-33 0-56.5-23.5T600-600v-40h-80v320h80v-40q0-33 23.5-56.5T680-440h120q33 0 56.5 23.5T880-360v160q0 33-23.5 56.5T800-120H680q-33 0-56.5-23.5T600-200Z"/></svg><span class="rail-lbl">Bracket</span></a>
+  <a href="#/info" data-r="info" title="Rules"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M360-240h240q17 0 28.5-11.5T640-280q0-17-11.5-28.5T600-320H360q-17 0-28.5 11.5T320-280q0 17 11.5 28.5T360-240Zm0-160h240q17 0 28.5-11.5T640-440q0-17-11.5-28.5T600-480H360q-17 0-28.5 11.5T320-440q0 17 11.5 28.5T360-400ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h287q16 0 30.5 6t25.5 17l194 194q11 11 17 25.5t6 30.5v447q0 33-23.5 56.5T720-80H240Zm280-560q0 17 11.5 28.5T560-600h160L520-800v160Z"/></svg><span class="rail-lbl">Rules</span></a>
+  <i></i>
+  <a href="#/my-team" data-r="my-team" title="My Team"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M182-200q-51 0-79-35.5T82-322l42-300q9-60 53.5-99T282-760h396q60 0 104.5 39t53.5 99l42 300q7 51-21 86.5T778-200q-21 0-39-7.5T706-230l-90-90H344l-90 90q-15 15-33 22.5t-39 7.5Zm526.5-251.5Q720-463 720-480t-11.5-28.5Q697-520 680-520t-28.5 11.5Q640-497 640-480t11.5 28.5Q663-440 680-440t28.5-11.5Zm-80-120Q640-583 640-600t-11.5-28.5Q617-640 600-640t-28.5 11.5Q560-617 560-600t11.5 28.5Q583-560 600-560t28.5-11.5ZM310-510v40q0 13 8.5 21.5T340-440q13 0 21.5-8.5T370-470v-40h40q13 0 21.5-8.5T440-540q0-13-8.5-21.5T410-570h-40v-40q0-13-8.5-21.5T340-640q-13 0-21.5 8.5T310-610v40h-40q-13 0-21.5 8.5T240-540q0 13 8.5 21.5T270-510h40Z"/></svg><span class="rail-lbl">My Team</span></a>
+  <a href="#/staff" data-r="staff" title="Staff" class="rail-staff"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M367-527q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47ZM160-240v-32q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v32q0 33-23.5 56.5T720-160H240q-33 0-56.5-23.5T160-240Z"/></svg><span class="rail-lbl">Staff login</span></a>
+  <span class="rail-v">v 1.0</span>
+</aside>
 <main id="app"></main>
 <div id="toast" role="status" aria-live="polite"></div>
-<footer class="foot">Community tournament for Free Fire players · Not affiliated with Garena · <span id="modeNote"></span></footer>
+<footer class="foot">Community tournament for Free Fire players · Not affiliated with Garena · Team icons: <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a> (CC BY 3.0) · <span id="modeNote"></span></footer>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
-<script src="config.js?v=20261116"></script>
-<script src="engine.js?v=20261116"></script>
-<script src="cloud.js?v=20261116"></script>
-<script src="app.js?v=20261116"></script>
+<script src="config.js?v=20261145"></script>
+<script src="engine.js?v=20261145"></script>
+<script src="cloud.js?v=20261145"></script>
+<script src="ocr.js?v=20261145"></script>
+<script src="app.js?v=20261145"></script>
 </body>
 </html>

@@ -297,6 +297,23 @@ function makeMatches(stage) {
     });
   });
 }
+// Demo tournament (Settings → Demo data): sample teams, Stages 1 and 2 played and closed, Stage 3 published with half of
+// each group's matches played and one match live. Same steps as the Stages buttons: generate, publish, simulate, approve.
+function loadDemoTournament() {
+  const ids = slotTeams().filter(t => t.status === 'approved').sort((a, b) => a.slotNo - b.slotNo).map(t => t.id);
+  S.stages.push(buildStage(0, ids, 'sequential')); S.settings.regOpen = false;
+  for (let k = 0; k < 20; k++) {
+    const st = S.stages[k];
+    st.wcTray.slice().forEach(id => { const g = st.groups.reduce((a, b) => b.teamIds.length < a.teamIds.length ? b : a); if (g.teamIds.length < E.GROUP_SIZE) { g.teamIds.push(id); st.wcTray = st.wcTray.filter(x => x !== id); } });
+    makeMatches(st); st.status = 'published';
+    const last = k === 2 || st.final;
+    st.groups.forEach(g => { const upto = last ? Math.floor(g.matches.length / 2) : g.matches.length;
+      g.matches.forEach((m, i) => { if (i < upto) Object.assign(m, { checkins: g.teamIds.slice(), results: randomResults(g.teamIds), status: 'completed', screenshots: ['simulated.png'], resultStatus: 'approved' }); }); });
+    if (last) { const m = st.groups[0].matches.find(x => x.resultStatus !== 'approved'); if (m) m.status = 'live'; break; }
+    st.qualified = qualifiersOf(st); st.status = 'done';
+    S.stages.push(buildStage(k + 1, st.qualified, 'seeded'));
+  }
+}
 function findTeamPlace(teamId) {
   for (let si = S.stages.length - 1; si >= 0; si--) {
     const st = S.stages[si];
@@ -1332,8 +1349,8 @@ function viewSettings() {
     <div id="setErr" role="alert"></div>
     <div class="row" style="margin-top:12px"><button class="btn">Save settings</button></div>
   </form></div>
-  <div class="card"><h3>Demo data</h3><div class="row"><button class="btn ghost" data-act="sample">Load sample data (252 + 12 WC)</button><button class="btn red" data-act="reset">Reset everything</button></div>
-    <p class="small muted">Sample data replaces everything in this browser.</p></div></div>`;
+  <div class="card"><h3>Demo data</h3><div class="row"><button class="btn ghost" data-act="sample">Load sample teams (registration open)</button><button class="btn ghost" data-act="demoTour">Load demo tournament (Stage 3 live)</button><button class="btn red" data-act="reset">Reset everything</button></div>
+    <p class="small muted">Each button replaces ALL teams, stages and results${Cloud.on ? ' in the database' : ' in this browser'}. <b>Sample teams</b>: 252 teams + 12 Wild Cards with registration open. <b>Demo tournament</b>: the same teams with Stages 1–2 played and Stage 3 live (groups, matches, standings). <b>Reset everything</b>: empty, with registration open so the Register page works.</p></div></div>`;
 }
 let teamFilter = { q: '', status: 'all' }, emailLogRows = null;
 let showPw = false, pwResult = null;
@@ -2091,8 +2108,20 @@ document.addEventListener('click', e => {
     case 'teamlogout': if (Cloud.on) { Cloud.teamLogout().then(render); break; } session.teamCode = null; done(); break;
     case 'checkin': if (Cloud.on && !Cloud.role) { el.disabled = true; Cloud.checkin(el.dataset.m).then(() => { toast('Checked in ✅'); render(); }, err => { toast(err.message); render(); }); break; }
     { const { m } = findMatch(el.dataset.m); if (!m.checkins.includes(el.dataset.t)) m.checkins.push(el.dataset.t); log('Checked in', team(el.dataset.t).name + ' ' + m.id); done('Checked in ✅'); break; }
-    case 'sample': if (confirm('Replace ALL tournament data with 252 sample teams + 6 Wild Cards?')) { (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => { const keep = S.settings; loadSample(); if (Cloud.on) { S.settings = keep; save(); } toast('Sample data loaded'); render(); }, err => toast(err.message)); } break;
-    case 'reset': if (confirm('Delete ALL teams, stages and results and start empty?')) { (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => { const keep = S.settings; S = fresh(); if (Cloud.on) S.settings = keep; session.teamCode = null; done('Reset'); }, err => toast(err.message)); } break;
+    case 'sample': case 'demoTour': {
+      const tour = act === 'demoTour';
+      if (!confirm(tour ? 'Replace ALL tournament data with a demo tournament (264 teams, Stages 1–2 played, Stage 3 live)?' : 'Replace ALL tournament data with 252 sample teams + 12 Wild Cards? Registration stays open.')) break;
+      (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => {
+        const keep = S.settings; loadSample(); if (Cloud.on) S.settings = keep;
+        if (Number(S.settings.wildCards) % E.GROUP_SIZE) S.settings.wildCards = wcTeams().length;   // Wild Cards must be a multiple of 12
+        S.settings.regOpen = true;
+        if (tour) { const why = stage1Blocked(); if (why) { save(); toast('Sample teams loaded, but ' + why); render(); return; } loadDemoTournament(); }
+        log(tour ? 'Demo tournament loaded' : 'Sample data loaded', tour ? 'Stages 1–2 played, Stage 3 live' : '252 slot teams + 12 Wild Cards');
+        save(); toast(tour ? 'Demo tournament loaded' : 'Sample data loaded'); render();
+      }, err => toast(err.message));
+      break;
+    }
+    case 'reset': if (confirm('Delete ALL teams, stages and results and start empty? Registration opens again.')) { (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => { const keep = S.settings; S = fresh(); if (Cloud.on) S.settings = keep; S.settings.regOpen = true; session.teamCode = null; log('Reset everything', 'registration open'); done('Reset: registration is open'); }, err => toast(err.message)); } break;
     case 'approve': { const t = team(el.dataset.id); if (t.status === 'rejected' && t.entry === 'SLOT') { if (usedSlots() >= S.settings.slots) { toast('No free slot'); return; } t.slotNo = freeSlotNo(); } t.status = 'approved'; t.reason = ''; notify(t.id, 'approved', '', approvedText(t)); log('Team approved', t.code + ' ' + t.name); done(); break; }
     case 'reject': { const t = team(el.dataset.id); const why = prompt('Reason for rejecting ' + t.name + '?', 'Duplicate player'); if (why === null) return; t.status = 'rejected'; t.reason = why; t.slotNo = null; log('Team rejected', t.code + ' — ' + why); promoteWaitlist(); done(); break; }
     case 'approveAll': { const n = slotTeams().filter(t => t.status === 'pending').map(t => { t.status = 'approved'; notify(t.id, 'approved', '', approvedText(t)); }).length; log('Bulk approve', n + ' teams'); done(n + ' approved'); break; }

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="currentColor" aria-label="Squad Cup">
+  <!-- Squad Cup monogram: hand-drawn angular S + C, 8-unit strokes, 45° chamfers, hooked terminals -->
+  <path d="M10 14 14 10H30L34 14V20H26V18H18V24H30L34 28V50L30 54H12L8 50V44H16V46H26V32H14L10 28Z"/>
+  <path d="M38 14 42 10H54L58 14V20H50V18H46V46H50V44H58V50L54 54H42L38 50Z"/>
+</svg>
