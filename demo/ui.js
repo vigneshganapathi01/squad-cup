@@ -100,6 +100,7 @@
   var ABOUT = 'A community esports organiser running Free Fire tournaments for Indian squads: fair rooms, '
     + 'published points tables and quick payouts. Room IDs and passwords go out on WhatsApp before each match.';
   var SPONSOR_SLOTS = 3;
+  var RULEBOOK = 'docs/rulebook.html'; // generated from Don_Justice_General_Rules_GFF_Latin_W05.docx
   var AD = {
     eyebrow: 'Garena Free Fire',
     title: 'New season is live',
@@ -126,12 +127,17 @@
     box.className = 'ov-pre';
     box.innerHTML =
       '<div class="ov-row">' +
+        '<div class="ov-left">' +
         '<section class="card ov-card"><h3 class="ov-h">Tournament overview</h3>' +
           '<p class="ov-lead">' + esc(st.name || '') + ' is a free-to-enter Free Fire squad tournament. Register your team of four, '
             + 'play the group stages and fight through to the final.</p>' +
           '<dl class="ov-facts">' + facts.map(function (f) { return '<div><dt>' + f[0] + '</dt><dd>' + esc(f[1]) + '</dd></div>'; }).join('') + '</dl>' +
-          '<div class="ov-links">' + (st.regOpen ? '<a class="btn small" href="#/register">Register your team</a>' : '') + '<a class="btn ghost small" href="#/info">Rules &amp; points</a></div>' +
         '</section>' +
+        '<section class="card ov-rules"><div class="ov-rules-h"><span class="ov-rules-t"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm4 18H6V4h7v5h5zM8 12h8v2H8zm0 4h8v2H8zm0-8h3v2H8z"/></svg>Rules &amp; Regulations</span><span class="ov-rules-k">Standard regulations</span></div>' +
+          '<div class="ov-rules-b"><p>The official rulebook has been published for this tournament. Review the code of conduct, tiebreakers, device and fair-play rules, and the point system:</p>' +
+          '<a class="btn ghost ov-rules-btn" href="' + RULEBOOK + '" target="_blank" rel="noopener">Access official rulebook <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14zM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg></a></div>' +
+        '</section>' +
+        '</div>' +
         '<section class="card ov-card ov-org"><h3 class="ov-h">Organiser &amp; sponsors</h3>' +
           '<div class="ov-org-main"><img src="art/dj-esports.webp" alt=""><div><span>Organised by</span><b>' + esc(org) + '</b></div></div>' +
           '<div class="ov-sub">Sponsors</div>' +

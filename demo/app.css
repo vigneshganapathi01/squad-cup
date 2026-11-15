@@ -1286,7 +1286,7 @@ h1,h2,.hero-title,.groupcard h3{letter-spacing:.03em!important}
 /* ===== Frame surface: navy panel with the angular line texture (reference), art faintly showing through the top ===== */
 .frame{background:#1e2235!important}
 .frame:before{content:""!important;position:absolute;inset:0!important;height:auto!important;opacity:1!important;z-index:-1;pointer-events:none;
-  background:url(art/lines-tl.svg) 0 0/max(1600px,100%) auto no-repeat,url(art/lines-br.svg) 100% 100%/1600px auto no-repeat,linear-gradient(180deg,#363a4b 0,#2b2f43 280px,#20253a 620px,#1e2235 900px,#1c2033 100%);
+  background:url(art/lines-tl.svg?v=3) 0 0/max(1600px,100%) auto no-repeat,url(art/lines-br.svg?v=3) 100% 100%/1600px auto no-repeat,linear-gradient(180deg,#363a4b 0,#2b2f43 280px,#20253a 620px,#1e2235 900px,#1c2033 100%);
   -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.86) 0,rgba(0,0,0,.94) 200px,#000 340px);mask-image:linear-gradient(180deg,rgba(0,0,0,.86) 0,rgba(0,0,0,.94) 200px,#000 340px)}
 .frame{background:transparent!important}
 .frame>.top,.frame>.rail{background:rgba(30,34,53,.25)!important}
@@ -1945,3 +1945,46 @@ html.hero-cd .card.promo{margin-top:0}
 @media(max-width:900px){.ov-row{grid-template-columns:minmax(0,1fr)}.ov-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.ov-card{padding:18px!important}.ov-about-in{align-items:flex-start}.ov-about-in img{width:52px;height:52px}
   .ov-ad{aspect-ratio:auto;min-height:220px}.ov-ad::after{width:100%;aspect-ratio:auto;-webkit-mask-image:none;mask-image:none;background-position:65% center}.ov-ad::before{background:linear-gradient(90deg,rgba(11,12,24,.95),rgba(11,12,24,.55))}}
+/* overview: left column stacks Tournament overview + Rules & Regulations; organiser card fills the right */
+.ov-left{display:grid;gap:18px;min-width:0}
+.ov-facts{margin-bottom:0!important}
+.ov-rules{padding:0!important;margin:0!important;overflow:hidden}
+.ov-rules-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 24px;border-bottom:1px solid var(--glass-line);background:rgba(0,0,0,.14)}
+.ov-rules-t{display:flex;align-items:center;gap:10px;font:500 14px/1 var(--display);letter-spacing:.06em;color:var(--accent-text)}
+.ov-rules-t svg{width:18px;height:18px;fill:currentColor}
+.ov-rules-k{font-size:13px;color:var(--muted)}
+.ov-rules-b{padding:20px 24px 22px}
+.ov-rules-b p{margin:0 0 16px;line-height:1.65;color:var(--ink-2,#c9cbe0);max-width:70ch}
+.ov-rules-btn{display:inline-flex!important;align-items:center;gap:10px}
+.ov-rules-btn svg{width:16px;height:16px;fill:currentColor}
+@media(max-width:560px){.ov-rules-h,.ov-rules-b{padding-left:18px;padding-right:18px}}
+.ov-org .ov-sponsors{flex:1;grid-template-columns:minmax(0,1fr);grid-auto-rows:minmax(56px,1fr)}
+.ov-org .ov-slot{min-height:56px}
+.ov-rules-btn{border:1px solid rgba(255,255,255,.2)!important;padding:12px 18px!important}
+.ov-rules-btn:hover{border-color:rgba(var(--acc-rgb),.6)!important}
+@media(max-width:900px){.ov-org .ov-sponsors{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:auto}}
+/* ===== Registered (success) screen: esports success badge instead of an emoji ===== */
+.reg-done{position:relative;overflow:hidden;padding:34px 30px 28px!important;border:1px solid rgba(var(--acc-rgb),.35)!important;
+  background:radial-gradient(70% 55% at 50% 0,rgba(var(--acc-rgb),.28),transparent 70%),linear-gradient(180deg,rgba(32,35,58,.96),rgba(22,24,40,.96))!important}
+.reg-done::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 16px);-webkit-mask-image:linear-gradient(180deg,#000,transparent 60%);mask-image:linear-gradient(180deg,#000,transparent 60%)}
+.reg-done>*{position:relative}
+.rd-badge{width:104px;height:104px;margin:0 auto 14px;filter:drop-shadow(0 0 22px rgba(var(--acc-rgb),.55));animation:rd-in .6s cubic-bezier(.2,.9,.3,1.2) both}
+.rd-badge svg{width:100%;height:100%;overflow:visible}
+.rd-hex{fill:rgba(var(--acc-rgb),.16);stroke:var(--accent);stroke-width:2.5}
+.rd-hex2{fill:var(--accent);stroke:rgba(255,255,255,.35);stroke-width:1}
+.rd-chk{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:square;stroke-linejoin:miter;stroke-dasharray:50;stroke-dashoffset:50;animation:rd-chk .45s .35s ease-out forwards}
+@keyframes rd-in{from{opacity:0;transform:scale(.6) rotate(-8deg)}to{opacity:1;transform:none}}
+@keyframes rd-chk{to{stroke-dashoffset:0}}
+.rd-eb{font:500 12.5px/1 var(--display);letter-spacing:.2em;text-transform:uppercase;color:var(--accent-text);margin-bottom:6px}
+.reg-done h1{margin:0 auto 12px!important;width:fit-content;font-size:clamp(30px,4vw,40px)!important;letter-spacing:.06em!important;text-transform:uppercase}
+.reg-done>p.muted{max-width:40ch;margin:0 auto 18px!important}
+.rd-id{display:flex;align-items:center;justify-content:center;gap:18px;margin:6px auto 14px;padding:14px 22px;width:fit-content;max-width:100%;
+  border:1px solid var(--glass-line);border-radius:10px;background:rgba(0,0,0,.28);
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+.rd-id-t{text-align:left}
+.rd-id-t span{display:block;font:500 11.5px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.rd-id .big-code{font-size:38px!important;line-height:1!important;color:#fff!important;letter-spacing:.08em!important}
+.reg-done .row{gap:10px;margin-top:6px}
+@media(prefers-reduced-motion:reduce){.rd-badge{animation:none}.rd-chk{animation:none;stroke-dashoffset:0}}
+@media(max-width:560px){.reg-done{padding:26px 18px 22px!important}.rd-id .big-code{font-size:30px!important}}

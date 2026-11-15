@@ -486,11 +486,12 @@ function viewRegistered(code) {
   const mailNote = wcNote + (!Cloud.on ? '<p class="muted">Save your Team ID. You need it with the captain\'s mobile to open your dashboard.</p>'
     : t.emailed ? `<div class="notice" style="text-align:left">📧 We emailed your <b>Team ID and password</b> to <b>${esc(t.emailTo || 'the captain email')}</b>. Use that email + password on <b>My Team</b>. Check spam if you don't see it in a few minutes.</div>`
     : '<div class="notice" style="text-align:left">📧 Your login password will be emailed to the captain email soon. Then log in on <b>My Team</b>.</div>');
-  return `<div class="card ok" style="max-width:560px;margin:auto;text-align:center">
-    <h1>Registered! 🎉</h1>
+  return `<div class="card ok reg-done" style="max-width:560px;margin:auto;text-align:center">
+    <div class="rd-badge" aria-hidden="true"><svg viewBox="0 0 96 96"><path class="rd-hex" d="M48 5 85 26.5v43L48 91 11 69.5v-43z"/><path class="rd-hex2" d="M48 15 76 31v34L48 81 20 65V31z"/><path class="rd-chk" d="M33 49.5 43.5 60 64 38"/></svg></div>
+    <div class="rd-eb">Squad locked in</div>
+    <h1>Registered</h1>
     ${mailNote}
-    <div style="margin:10px 0">${avatar(t, 72)}</div>
-    <div class="big-code">${esc(t.code)}</div>
+    <div class="rd-id">${avatar(t, 64)}<div class="rd-id-t"><span>Team ID</span><div class="big-code">${esc(t.code)}</div></div></div>
     <p>${esc(t.name)} · ${t.entry === 'WC' ? '<span class="badge b-wc">Wild Card</span> ' + statusBadge(t.status) : t.status === 'waitlist' ? '<span class="badge b-warn">Waitlist</span> All slots are full right now.' : 'Slot ' + t.slotNo + ' · ' + statusBadge(t.status) + ' (waiting for admin approval)'}</p>
     <div class="row" style="justify-content:center">
       <button class="btn" data-act="copy" data-text="${esc(t.code)}">Copy Team ID</button>

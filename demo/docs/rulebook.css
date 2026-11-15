@@ -1,0 +1,44 @@
+/* Official rulebook page (generated from Don_Justice_General_Rules_GFF_Latin_W05.docx). Same look as the site: navy, violet, GFF Latin. */
+@font-face{font-family:"GFF Latin";src:url(../fonts/GFF-Latin-Regular.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"GFF Latin";src:url(../fonts/GFF-Latin-Medium.woff2) format("woff2");font-weight:500;font-display:swap}
+:root{--bg:#0d0f1b;--panel:#1b1e30;--line:rgba(255,255,255,.09);--ink:#eceefa;--ink-2:#c3c6dc;--muted:#9a9eb8;--accent:#7160fc;--accent-text:#a99dff;--acc-rgb:113,96,252}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{margin:0;background:radial-gradient(70% 50% at 20% 0,rgba(var(--acc-rgb),.16),transparent 70%),var(--bg);color:var(--ink);
+  font:400 16px/1.7 "GFF Latin",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+b,strong,h1,h2,h3,h4{font-weight:500}
+a{color:var(--accent-text)}
+.cover{max-width:1200px;margin:0 auto;padding:48px 24px 36px;display:flex;align-items:center;gap:28px;border-bottom:1px solid var(--line)}
+.cover-logo{width:110px;height:auto;flex:none}
+.eb{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-text)}
+.cover h1{margin:6px 0 4px;font-size:clamp(36px,6vw,64px);line-height:1.05;letter-spacing:.02em;text-transform:uppercase}
+.cover-sub{margin:0;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-size:13px}
+.back{margin-left:auto;align-self:flex-start;padding:10px 16px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--ink);font-size:14px;white-space:nowrap}
+.back:hover{border-color:rgba(var(--acc-rgb),.6)}
+.wrap{max-width:1200px;margin:0 auto;padding:32px 24px 80px;display:grid;grid-template-columns:280px minmax(0,1fr);gap:40px;align-items:start}
+.toc{position:sticky;top:20px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.toc-h{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.toc a{display:flex;gap:10px;padding:7px 8px;border-radius:6px;color:var(--ink-2);text-decoration:none;font-size:14px;line-height:1.35}
+.toc a span{flex:none;width:24px;color:var(--accent-text);font-variant-numeric:tabular-nums}
+.toc a:hover{background:rgba(var(--acc-rgb),.12);color:#fff}
+.rules section{padding:26px 28px;margin-bottom:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.rules h2{display:flex;align-items:baseline;gap:14px;margin:0 0 14px;font-size:22px;line-height:1.25;letter-spacing:.02em}
+.rules h2 span{font-size:14px;color:var(--accent-text);letter-spacing:.1em;padding:3px 8px;border-radius:4px;background:rgba(var(--acc-rgb),.14)}
+.rules h3{margin:20px 0 6px;font-size:17px;color:#fff}
+.rules h4{margin:16px 0 4px;font-size:15.5px;color:var(--accent-text)}
+.rules p{margin:0 0 10px;color:var(--ink-2);max-width:78ch}
+.rules ul{margin:6px 0 12px;padding-left:20px;color:var(--ink-2)}
+.rules li{margin:4px 0}
+.rules li::marker{color:var(--accent)}
+.pts{margin:16px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;max-width:520px}
+.pts table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.pts th{text-align:left;padding:10px 16px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);background:rgba(0,0,0,.25);font-weight:500}
+.pts td{padding:9px 16px;border-top:1px solid var(--line);color:var(--ink-2)}
+.pts td:last-child,.pts th:last-child{text-align:right}
+.pts tr:first-child td{color:#e6bd6e}
+.src{font-size:13.5px;color:var(--muted)!important}
+.sign{margin-top:28px;color:var(--ink-2)}
+@media(max-width:860px){.wrap{grid-template-columns:minmax(0,1fr);gap:20px}.toc{position:static}.cover{flex-wrap:wrap;gap:18px;padding-top:28px}.cover-logo{width:76px}.back{margin-left:0;order:-1}}
+@media(max-width:560px){.rules section{padding:20px 18px}.rules h2{font-size:19px}}
+@media print{body{background:#fff;color:#111}.toc,.back{display:none}.wrap{display:block}.rules section{border-color:#ddd;background:#fff;break-inside:avoid}.rules p,.rules ul,.pts td{color:#222}.rules h3{color:#111}.cover h1{color:#111}}
