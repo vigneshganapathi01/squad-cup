@@ -6,7 +6,7 @@ const OCR_URL = ((window.SQUAD_CONFIG || {}).ocrUrl || '').replace(/\/$/, '');
 let ocr = null;   // { matchId, shots: [{ file, url }|null, …], status, msg, blocks, secs }
 
 function ocrState(matchId) {
-  if (!ocr || ocr.matchId !== matchId) ocr = { matchId, shots: [null, null], status: 'idle', msg: '', blocks: null };
+  if (!ocr || ocr.matchId !== matchId) ocr = { matchId, shots: [null, null], read: [], status: 'idle', msg: '', blocks: null, pop: null };
   return ocr;
 }
 const nfc = s => (s || '').normalize('NFC').replace(/\s+/g, ' ').trim();
@@ -78,6 +78,20 @@ function ocrRegistry() {
   return reg;
 }
 // How one screenshot row compares with the tournament list. cls: ok | warn | bad
+// A name that isn't linked in its own team but links to a player of another registered team with the same matcher used
+// inside a team (look-alike letters, clan tag or a decoration dropped), e.g. "G_SHADOW" for KG_SHADOW or "SD JACK" for
+// ᑌD ᴊᴀᴄᴋ ☣. A warning only: the screenshot may be cut off or misread, so the admin decides. Worked out once per row.
+function looksElsewhere(b, p) {
+  const key = b.teamId + '|' + readsOf(p).join('|');
+  if (p._looksKey !== key) {
+    const fm = findMatch(ocr.matchId), inMatch = new Set(fm ? fm.g.teamIds : []);
+    p._looksKey = key;
+    p._looks = ocrAllTeams().filter(t => t.id !== b.teamId).map(t => ({ t, m: E.matchReadings(readsOf(p), t.players) }))
+      .filter(x => x.m.how && x.m.how !== 'suggest').slice(0, 3)
+      .map(x => ({ teamName: x.t.name, player: x.m.player.name, inMatch: inMatch.has(x.t.id) }));
+  }
+  return p._looks;
+}
 function regCheck(b, p, t, reg) {
   const key = p.sub ? p.name : p.ocr, also = (p.alsoIn || []).filter(x => x.teamId !== b.teamId);
   const where = list => list.map(x => `<b>${esc(x.teamName)}</b>${x.inMatch ? '' : ' (not in this match)'}`).join(', ');
@@ -88,9 +102,11 @@ function regCheck(b, p, t, reg) {
   if (seen && seen.teamId !== b.teamId && (p.sub || !t || !t.players.some(x => x.uid === p.uid && nfc(x.name) === nfc(p.ocr))))
     return { cls: 'bad', other: seen.teamName, html: `Registered for <b>${esc(seen.teamName)}</b>${seen.inMatch ? '' : ' (not in this match)'}` };
   if (!t) return { cls: 'warn', html: 'Choose the team first' };
-  if (p.sub) return { cls: 'warn', html: 'Not on the tournament list · substitute' };
-  const rp = t.players.find(x => x.uid === p.uid);
-  if (!rp) return { cls: 'warn', html: 'Not linked to a registered player yet' };
+  const rp = p.sub ? null : t.players.find(x => x.uid === p.uid);
+  const look = rp ? [] : looksElsewhere(b, p);
+  const lookHtml = look.length ? `<br><b style="color:var(--red,#ef5350)">Looks like ${look.map(x => `${esc(x.player)}, registered for ${esc(x.teamName)}${x.inMatch ? '' : ' (not in this match)'}`).join(' · ')}.</b> <span class="muted">Check before choosing a player.</span>` : '';
+  if (p.sub) return { cls: 'warn', look: look.length > 0, html: 'Not on the tournament list · substitute' + lookHtml };
+  if (!rp) return { cls: 'warn', look: look.length > 0, html: 'Not linked to a registered player yet' + lookHtml };
   const same = p.exact || nfc(rp.name) === nfc(p.ocr);
   const alsoNote = also.length ? `<br><span class="muted">Same name also registered in ${where(also)} · matched here by teammates</span>` : '';
   return { cls: same ? 'ok' : 'warn', html: `✓ On ${esc(t.name)}'s list · slot ${rp.slot + 1}<br><span class="muted">UID ${esc(rp.uid || '—')}</span>${alsoNote}${p.how === 'lookalike' ? '<br><span class="muted">Same name in plain letters</span>' : p.how === 'tag' ? '<br><span class="muted">Same name; tag or decoration not read</span>' : same ? '' : '<br><span class="muted">Name on screen differs from registration</span>'}` };
@@ -107,7 +123,8 @@ function ocrCheck(roster) {
 // ---------- screen ----------
 function viewOcr() {
   const pr = params();
-  const list = S.stages.filter(s => s.status !== 'draft').flatMap(st => st.groups.flatMap(g => g.matches.map(m => ({ st, g, m }))));
+  // ClashSquad games have no Battle Royale result screen: they are entered by hand in the Room panel.
+  const list = S.stages.filter(s => s.status !== 'draft' && s.kind !== 'cs').flatMap(st => st.groups.flatMap(g => g.matches.map(m => ({ st, g, m }))));
   const open = list.filter(x => x.m.resultStatus !== 'approved');
   const sel = list.find(x => x.m.id === pr.m) || open[0];
   const head = `<h1>Upload screenshots</h1><p class="sub">Upload the Free Fire result screen of a match. The service reads every team, player and elimination; you check them, then publish to the Leaderboard.</p>`;
@@ -126,11 +143,16 @@ function viewOcr() {
   <div class="card"><div class="row between">${picker}<span class="small muted">${esc(m.map)} · ${g.teamIds.length} teams in this ${st.final ? 'final' : 'group'}</span></div>
     ${m.resultStatus === 'approved' ? '<div class="notice" style="margin-top:10px">This match already has a published result. Publishing again replaces it.</div>' : ''}
     <div class="ocr-slots">${slot(0)}${slot(1)}</div>
-    <div class="row"><button class="btn" data-act="ocrRun" ${!o.shots[0] || busy || !OCR_URL ? 'disabled' : ''}>${busy ? 'Processing…' : o.blocks ? 'Process again' : 'Process results'}</button>
-      ${o.shots[0] || o.blocks ? '<button class="btn ghost small" data-act="ocrClear">Clear</button>' : ''}
+    <div class="row">${o.blocks && o.shots.some((x, i) => x && !o.read.includes(i))
+      ? `<button class="btn" data-act="ocrAdd" ${busy || !OCR_URL ? 'disabled' : ''}>${busy ? 'Processing…' : 'Add screenshot ' + o.shots.map((x, i) => x && !o.read.includes(i) ? i + 1 : 0).filter(Boolean).join(' + ') + ' to the table'}</button><button class="btn ghost small" data-act="ocrRun" data-again="1" ${busy || !OCR_URL ? 'disabled' : ''}>Read again from scratch</button>`
+      : `<button class="btn" data-act="ocrRun" ${!o.shots.some(Boolean) || busy || !OCR_URL ? 'disabled' : ''}>${busy ? 'Processing…' : o.blocks ? 'Read again from scratch' : 'Process results'}</button>`}
+      ${o.shots[0] || o.shots[1] || o.blocks ? '<button class="btn ghost small" data-act="ocrClear">Clear</button>' : ''}
       <span class="small ${o.status === 'error' ? 'bad' : 'muted'}">${status}</span></div>
   </div>
-  ${o.blocks ? ocrReview(roster) : ''}`;
+  ${o.blocks && o.added ? `<div class="notice" style="margin-top:10px">Screenshot ${o.added.shot}: ${o.added.added.length ? `added rank${o.added.added.length > 1 ? 's' : ''} ${o.added.added.join(', ')}` : 'no new teams'}${o.added.skipped ? ` · ${o.added.skipped} already in the table, left as they are` : ''}.</div>` : ''}
+  ${o.blocks ? (() => { const mi = ocrMissing(roster); return mi.any ? `<div class="card ocr-missing"><h3>Missing from the screenshot${o.read.length > 1 ? 's' : ''} · ${mi.read} of ${mi.expected} teams read</h3>${missingHtml(mi)}</div>` : ''; })() : ''}
+  ${o.blocks ? ocrReview(roster) : ''}
+  ${o.pop && o.pop.any ? `<div class="ocr-pop" role="dialog" aria-modal="true" aria-label="Missing from the screenshot"><div class="card"><h3>Check: something is missing</h3><p>Every match has ${o.pop.expected} teams. The screenshot${o.read.length > 1 ? 's' : ''} showed ${o.pop.read}.</p>${missingHtml(o.pop)}<div class="row"><button class="btn" data-act="ocrPopOk">OK, I'll check</button></div></div></div>` : ''}`;
 }
 
 function ocrReview(roster) {
@@ -139,7 +161,7 @@ function ocrReview(roster) {
   const used = new Set(ocr.blocks.map(b => b.teamId).filter(Boolean));
   const players = ocr.blocks.reduce((a, b) => a + b.players.length, 0);
   const sorted = ocr.blocks.map((b, i) => ({ b, i })).sort((x, y) => (x.b.rank || 99) - (y.b.rank || 99));
-  const tally = { ok: 0, warn: 0, bad: 0, sub: 0 };
+  const tally = { ok: 0, warn: 0, bad: 0, sub: 0, look: 0 };
   const groups = sorted.map(({ b, i }) => {
     const t = byId[b.teamId], n = Math.max(b.players.length, 1);
     const k = b.players.reduce((a, p) => a + (Number.isInteger(p.kills) ? p.kills : 0), 0), pp = b.rank ? (E.PLACEMENT_POINTS[b.rank - 1] || 0) : 0;
@@ -152,7 +174,7 @@ function ocrReview(roster) {
     if (!b.players.length) return `<tbody class="ocr-grp"><tr>${rankCell}${teamCell}<td colspan="6" class="muted small">No players read for this team.</td>${totCells}</tr></tbody>`;
     const rows = b.players.map((p, j) => {
       const dup = (p.sub ? ids['sub:' + nfc(p.name)] : ids[p.uid]) > 1, sure = ocrSure(p), rc = regCheck(b, p, t, reg);
-      tally[rc.cls]++; if (p.sub) tally.sub++;
+      tally[rc.cls]++; if (p.sub) tally.sub++; if (rc.look) tally.look++;
       const opts = (t ? t.players : []).map(x => `<option value="${esc(x.uid)}" ${!p.sub && p.uid === x.uid ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
       const conf = Math.round((p.conf || 0) * 100);
       return `<tr class="${dup || rc.cls === 'bad' ? 'dup' : !sure && !p.ok ? 'warn' : ''}">${j ? '' : rankCell + teamCell}
@@ -172,7 +194,7 @@ function ocrReview(roster) {
   }).join('');
   const noShows = roster.filter(t => !used.has(t.id));
   const table = `<div class="card"><div class="row between"><h3>Match result: teams and players</h3><span class="small muted">${ocr.blocks.length} teams · ${players} player records</span></div>
-    <p class="small ocr-tally">Tournament list check: <span class="good">${tally.ok} match their team's registration</span> · ${tally.warn} to check${tally.sub ? ` (${tally.sub} substitute${tally.sub > 1 ? 's' : ''})` : ''}${tally.bad ? ` · <span class="bad">${tally.bad} registered for another team</span>` : ''}</p>
+    <p class="small ocr-tally">Tournament list check: <span class="good">${tally.ok} match their team's registration</span> · ${tally.warn} to check${tally.sub ? ` (${tally.sub} substitute${tally.sub > 1 ? 's' : ''})` : ''}${tally.bad ? ` · <span class="bad">${tally.bad} registered for another team</span>` : ''}${tally.look ? ` · <span class="bad">${tally.look} look like another team's player</span>` : ''}</p>
     <div class="tw"><table class="ocr-table"><thead><tr><th>Rank</th><th>Team</th><th>Name on screen</th><th>Registered player</th><th>Tournament list</th><th>Elims</th><th>Check</th><th></th><th>Team elims</th><th>Pos pts</th><th>Total</th></tr></thead>
     ${groups}
     ${noShows.length ? `<tbody class="ocr-grp">${noShows.map(t => `<tr class="muted"><td class="rk">–</td><td>${esc(t.name)}</td><td colspan="9">Not on the screenshots: no-show</td></tr>`).join('')}</tbody>` : ''}
@@ -188,25 +210,56 @@ function ocrReview(roster) {
 }
 
 // ---------- actions ----------
-async function ocrRun() {
-  const o = ocr; if (!o || !o.shots[0]) return;
+async function ocrRun(addOnly) {
+  const o = ocr; if (!o || !o.shots.some(Boolean)) return;
+  // Add mode: read only the screenshots not yet in the table and keep every row already there (with the admin's edits).
+  const slots = o.shots.map((s, i) => s && (!addOnly || !o.read.includes(i)) ? i : -1).filter(i => i >= 0);
+  if (!slots.length) return;
   o.status = 'busy'; o.msg = ''; render();
   try {
     const fd = new FormData();
-    o.shots.forEach((s, i) => { if (s) fd.append('shot' + (i + 1), s.file, s.file.name); });
+    slots.forEach((i, k) => fd.append('shot' + (k + 1), o.shots[i].file, o.shots[i].file.name));
     const headers = {}, token = Cloud.on ? await Cloud.accessToken() : null;
     if (token) headers.Authorization = 'Bearer ' + token;
     const r = await fetch(OCR_URL + '/extract', { method: 'POST', body: fd, headers });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.detail || 'OCR service error ' + r.status);
-    o.blocks = j.teams.map(t => ({ rank: t.rank, shot: t.shot, partial: t.partial, teamId: '', shortOk: false,
+    const fresh = j.teams.map(t => ({ rank: t.rank, shot: slots[(t.shot || 1) - 1] + 1, partial: t.partial, teamId: '', shortOk: false,
       players: t.players.map(p => ({ ocr: p.name, alts: p.alts || [], conf: p.conf, crop: p.crop, kills: p.kills, killsCrop: p.kills_crop, killsChecked: p.kills_checked, uid: null, exact: false, ok: false, sub: false, name: '' })) }));
-    const fm = findMatch(o.matchId); ocrLink(o.blocks, ocrRoster(fm.g));
+    const fm = findMatch(o.matchId), roster = ocrRoster(fm.g);
+    ocrLink(fresh, roster);
+    if (addOnly && o.blocks) {
+      // the scrolled screenshot overlaps the first one: a rank or a team already in the table is not taken again
+      const ranks = new Set(o.blocks.map(b => b.rank)), teams = new Set(o.blocks.map(b => b.teamId).filter(Boolean));
+      const add = fresh.filter(b => !ranks.has(b.rank) && !(b.teamId && teams.has(b.teamId)));
+      // a team the admin already has in the table can't be guessed again for a new rank
+      add.forEach(b => { if (b.teamId && teams.has(b.teamId)) b.teamId = ''; teams.add(b.teamId); });
+      o.blocks = o.blocks.concat(add);
+      o.added = { shot: slots.map(i => i + 1).join(' + '), added: add.map(b => b.rank).sort((x, y) => x - y), skipped: fresh.length - add.length };
+    } else { o.blocks = fresh; o.added = null; }
+    o.read = [...new Set([...(addOnly ? o.read : []), ...slots])];
     o.status = 'done'; o.secs = j.seconds;
+    o.pop = ocrMissing(roster);   // pop-up: teams or players missing from the screenshots
   } catch (err) {
     o.status = 'error'; o.msg = /fetch/i.test(err.message) ? 'Could not reach the OCR service at ' + OCR_URL + '. Is it running?' : err.message;
   }
   if (ocr === o) render();
+}
+// What the screenshots don't show: teams of the match not in the table, and teams showing fewer than 4 players
+// (with the registered players that are not on the screen).
+function ocrMissing(roster) {
+  const used = new Set(ocr.blocks.map(b => b.teamId).filter(Boolean));
+  const teams = roster.filter(t => !used.has(t.id));
+  const short = ocr.blocks.filter(b => b.players.length < 4).sort((a, b) => a.rank - b.rank).map(b => {
+    const t = roster.find(x => x.id === b.teamId), shownUids = new Set(b.players.map(p => p.uid).filter(Boolean));
+    return { rank: b.rank, team: t ? t.name : '', shown: b.players.length, missing: t ? t.players.filter(x => !shownUids.has(x.uid)).map(x => x.name) : [] };
+  });
+  return { expected: roster.length, read: ocr.blocks.length, teams: teams.map(t => t.name), short, any: teams.length > 0 || short.length > 0 };
+}
+function missingHtml(mi) {
+  return `${mi.teams.length ? `<p><b>${mi.teams.length} of ${mi.expected} teams are not on the screenshot${ocr.read.length > 1 ? 's' : ''}:</b> ${mi.teams.map(esc).join(', ')}. They will be marked no-show unless you add them.</p>` : ''}
+    ${mi.short.length ? `<p><b>Teams with missing players:</b></p><ul>${mi.short.map(x => `<li>Rank ${x.rank}${x.team ? ' · ' + esc(x.team) : ''}: ${x.shown} of 4 players shown${x.missing.length ? ` · missing <b>${x.missing.map(esc).join(', ')}</b>` : ''}</li>`).join('')}</ul>` : ''}
+    ${!ocr.shots[1] || !ocr.read.includes(1) ? '<p class="small muted">Tip: upload Screenshot 2 (the list scrolled to the bottom) to read the rest. Teams already in the table are kept as they are.</p>' : '<p class="small muted">Add the missing players with “+ Add player”, or tick “Fewer than 4 confirmed”.</p>'}`;
 }
 function ocrPublish() {
   const fm = findMatch(ocr.matchId); if (!fm) return;
@@ -236,7 +289,7 @@ document.addEventListener('change', e => {
     if (!/^image\/(png|jpeg|webp)$/.test(f.type)) { toast('Use a PNG, JPG or WEBP screenshot'); return; }
     if (f.size > 10 * 1024 * 1024) { toast('Screenshot must be under 10 MB'); return; }
     const old = ocr.shots[+el.dataset.slot]; if (old) URL.revokeObjectURL(old.url);
-    ocr.shots[+el.dataset.slot] = { file: f, url: URL.createObjectURL(f) }; render(); return;
+    ocr.shots[+el.dataset.slot] = { file: f, url: URL.createObjectURL(f) }; ocr.read = (ocr.read || []).filter(i => i !== +el.dataset.slot); render(); return;
   }
   if (act !== 'ocrF' || !ocr?.blocks) return;
   const b = ocr.blocks[+el.dataset.b], p = el.dataset.p !== undefined ? b.players[+el.dataset.p] : null, k = el.dataset.k;
@@ -262,9 +315,11 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.tagName === 'SELECT' || el.tagName === 'INPUT') return;
   const act = el.dataset.act; if (!act.startsWith('ocr') || !ocr) return;
   e.preventDefault();
-  if (act === 'ocrRun') return void ocrRun();
+  if (act === 'ocrRun') { if (el.dataset.again && ocr.blocks && !confirm('Read the screenshots again from scratch? Your changes in the table will be replaced.')) return; return void ocrRun(false); }
+  if (act === 'ocrAdd') return void ocrRun(true);
   if (act === 'ocrPublish') return ocrPublish();
   if (act === 'ocrClear') { ocr.shots.forEach(s => s && URL.revokeObjectURL(s.url)); ocr = null; render(); return; }
+  if (act === 'ocrPopOk') { ocr.pop = null; render(); return; }
   const b = ocr.blocks && ocr.blocks[+el.dataset.b];
   if (act === 'ocrDelP') b.players.splice(+el.dataset.p, 1);
   if (act === 'ocrAddP') b.players.push({ ocr: '', conf: 0, kills: 0, uid: null, exact: false, ok: false, sub: false, name: '' });

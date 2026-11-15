@@ -213,6 +213,14 @@ const Cloud = (() => {
   function listenReload() { clearTimeout(reloadTimer); reloadTimer = setTimeout(() => queue.then(loadAll).then(render), 1500); }
 
   async function init() { await loadRole(); await loadAll(); listen(); return role; }
+  // Ad videos go to the public Storage bucket "ads" (supabase/ads.sql); only admins can upload or delete.
+  async function uploadAd(file) {
+    const ext = file.type === 'video/webm' ? 'webm' : 'mp4', path = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    const { error } = await sb.storage.from('ads').upload(path, file, { contentType: file.type, upsert: false });
+    if (error) throw new Error(/bucket|not found/i.test(error.message) ? 'Video storage is not set up yet. Run supabase/ads.sql in Supabase first.' : 'Upload failed: ' + error.message);
+    return sb.storage.from('ads').getPublicUrl(path).data.publicUrl;
+  }
+  async function removeAd(url) { const path = String(url).split('/storage/v1/object/public/ads/')[1]; if (path) await sb.storage.from('ads').remove([decodeURIComponent(path)]); }
   const accessToken = async () => on ? (await sb.auth.getSession()).data.session?.access_token || null : null;
-  return { on, accessToken, init, sync, loadAll, register, teamLogin, teamLogout, resetPassword, sendLogins, emailLog, teamPasswords, setPassword, get passwords() { return passwords; }, wcInviteInfo, registerWildcard, sendWcInvite, refreshTeam, checkin, complain, reset, signIn, signOut, get role() { return role; } };
+  return { on, accessToken, uploadAd, removeAd, init, sync, loadAll, register, teamLogin, teamLogout, resetPassword, sendLogins, emailLog, teamPasswords, setPassword, get passwords() { return passwords; }, wcInviteInfo, registerWildcard, sendWcInvite, refreshTeam, checkin, complain, reset, signIn, signOut, get role() { return role; } };
 })();

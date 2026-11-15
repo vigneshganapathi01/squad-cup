@@ -91,7 +91,9 @@ function promoteWaitlist() {
 
 // ---------- stage logic using actual data ----------
 const curStage = () => S.stages[S.stages.length - 1];
-const groupResults = g => g.matches.filter(m => m.resultStatus === 'approved').map(m => m.results);
+// A match needs nothing more: result approved, or a ClashSquad game not needed because its pair was already decided.
+const mDone = m => m.resultStatus === 'approved' || m.resultStatus === 'skipped';
+const groupResults = g => g.matches.filter(m => m.resultStatus === 'approved' && m.results).map(m => m.results);
 const wcTeams = () => S.teams.filter(t => t.entry === 'WC' && t.status === 'approved');
 const wcJoined = () => S.stages.some(s => s.wcJoin > 0);
 function approvedSlotCount() { return slotTeams().filter(t => t.status === 'approved').length; }
@@ -99,6 +101,24 @@ function approvedSlotCount() { return slotTeams().filter(t => t.status === 'appr
 const wcPlanned = () => (Cloud.on && !Cloud.role) ? S.settings.wildCards : wcTeams().length;
 // Wild Cards are optional: the admin turns them on (how many: a multiple of 12) or off (0) in Settings → Format.
 const wcOn = () => (Number(S.settings.wildCards) || 0) > 0;
+// ---------- roadmap templates (fixed stages; the admin edits Total, Qualified and MT per stage) ----------
+const tplOn = () => !!(S.settings.template && E.TEMPLATES[S.settings.template]);
+const tplDef = () => E.TEMPLATES[S.settings.template];
+const tplRows = (counts = S.settings.tplCounts) => E.tplPlan(tplDef(), counts);
+const tplLockedKeys = () => new Set(S.stages.map(st => st.tpl).filter(Boolean));
+const tplDoneKeys = () => new Set(S.stages.filter(st => st.tpl && st.status === 'done').map(st => st.tpl));
+// Standing units of a stage: the 3 groups of a paired stage (their lobbies are st.groups), otherwise the groups themselves.
+const units = st => st.pools || st.groups;
+const unitSize = st => st.unitSize || E.GROUP_SIZE;
+const liveStages = () => S.stages.filter(s => s.status === 'published');
+const stageByKey = k => S.stages.find(x => x.tpl === k);
+// The lobbies a paired group plays in (each lobby is two groups together).
+const lobbiesOf = (st, u) => st.pools && st.pools.includes(u) ? st.groups.filter(g => g.teamIds.some(id => u.teamIds.includes(id))) : [u];
+// Approved Wild Card teams not yet placed in any stage (registration order).
+const placedIds = () => new Set(S.stages.flatMap(st => [...units(st).flatMap(u => u.teamIds), ...(st.wcTray || [])]));
+const unplacedWc = () => { const done = placedIds(); return wcTeams().filter(t => !done.has(t.id)).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); };
+// Wild Card invites close once every stage they join exists (templates) or once they have joined (other formats).
+const wcClosed = () => tplOn() ? tplRows().every(r => !(r.wcJoin > 0) || stageByKey(r.key)) : wcJoined();
 // ---------- the bracket: set by the admin as team counts ----------
 // Every group has exactly 12 teams. The admin sets Total slots (Stage 1) and how many teams enter each later stage
 // (S.settings.path, multiples of 12, the last = Grand Final 12) plus the stage the Wild Cards join (S.settings.wcStage).
@@ -118,12 +138,13 @@ function bracket(s = S.settings) {
 }
 const presetPath = (f, s = S.settings) => E.suggestPath(s.slots, Number(s.wildCards) || 0, f.stage1Top, f.laterTop);
 function formatOf(s) {
+  if (s.template && E.TEMPLATES[s.template]) return 'tpl:' + s.template;
   const b = bracket(s), same = (x, y) => x.path.join() === y.path.join() && x.wcStage === y.wcStage;
   return Object.keys(FORMATS).find(k => { const f = FORMATS[k];
     const m = stageMatches(s);
     return same(b, presetPath(f, s)) && m.slice(0, -1).every(v => v === f.matchesPerStage) && m[m.length - 1] === f.finalMatches && f.finalMode === (s.finalMode === 'rush' ? 'rush' : 'normal'); }) || 'custom';
 }
-const formatSelect = (s, name) => `<select name="${name}" data-act="preset">${Object.entries(FORMATS).map(([k, f]) => `<option value="${k}" ${formatOf(s) === k ? 'selected' : ''}>${f.label}</option>`).join('')}<option value="custom" ${formatOf(s) === 'custom' ? 'selected' : ''}>Custom (your own team counts)</option></select>`;
+const formatSelect = (s, name) => `<select name="${name}" data-act="preset">${Object.entries(FORMATS).map(([k, f]) => `<option value="${k}" ${formatOf(s) === k ? 'selected' : ''}>${f.label}</option>`).join('')}<option value="custom" ${formatOf(s) === 'custom' ? 'selected' : ''}>Custom (your own team counts)</option><optgroup label="Roadmap templates (fixed stages)">${Object.values(E.TEMPLATES).map(t => `<option value="tpl:${t.key}" ${formatOf(s) === 'tpl:' + t.key ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</optgroup></select>`;
 // Matches per group, set by the admin for each stage (S.settings.stageMatches: Stage 1 … Grand Final).
 // Older data has one number for every stage (matchesPerStage) and one for the final (finalMatches).
 function stageMatches(s = S.settings, n = bracket(s).path.length + 1) {
@@ -152,17 +173,17 @@ function remapNames(names, newLen) {
   return out;
 }
 const planOpts = () => ({ matches: S.settings.matchesPerStage, finalMatches: S.settings.finalMatches, matchesList: stageMatches(), names: stageNames() });
-const pathText = () => [S.settings.slots, ...bracket().path].join(' → ');
+const pathText = () => tplOn() ? tplDef().label + ': ' + tplRows().map(r => r.entering).join(' → ') : [S.settings.slots, ...bracket().path].join(' → ');
 // The whole tournament: stages already generated keep their real teams; the rest follow the admin's team counts.
 // Groups never come from how many teams have registered.
 function plan() {
-  const s = S.settings, b = bracket(), base = E.planPath(s.slots, Number(s.wildCards) || 0, b.path, b.wcStage, planOpts());
+  const s = S.settings, b = tplOn() ? null : bracket(), base = tplOn() ? tplRows() : E.planPath(s.slots, Number(s.wildCards) || 0, b.path, b.wcStage, planOpts());
   return base.map((ps, i) => {
     const st = S.stages[i]; if (!st) return ps;
-    const out = { ...ps, name: st.name, final: st.final, entering: st.entering, wcJoin: st.wcJoin || 0, sizes: st.groups.map(g => g.teamIds.length), matches: st.matchCount || ps.matches };
+    const out = { ...ps, name: st.name, final: st.final, entering: st.entering, wcJoin: st.wcIn ?? st.wcJoin ?? 0, sizes: units(st).map(g => g.teamIds.length), matches: st.matchCount || ps.matches };
     if (!st.final) {
       if (st.status === 'done') out.advancing = (st.qualified || []).length;
-      else { const r = E.qualifyRule(ps.advancing, st.groups.length); out.topN = r.topN; out.extra = out.fill = r.extra; }
+      else { const r = st.kind === 'cs' ? { topN: 1, extra: 0 } : E.qualifyRule(ps.advancing, units(st).length); out.topN = r.topN; out.extra = out.fill = r.extra; }
     }
     return out;
   });
@@ -179,6 +200,7 @@ function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n 
 // Problems with the bracket, trying settings without saving them (over: slots, wildCards, path, wcStage). Empty = fine.
 // Stages already generated are not checked again.
 function formatProblems(over = {}) {
+  if (tplOn() && !('path' in over)) return E.checkTemplate(tplDef(), over.tplCounts || S.settings.tplCounts, tplLockedKeys(), tplDoneKeys());
   const s = { ...S.settings, ...over }, b = bracket(s);
   const errs = E.checkPath(s.slots, Number(s.wildCards) || 0, b.path, b.wcStage, S.stages.length, stageNames(s));
   return wcJoined() ? errs.filter(e => !e.startsWith('Wild Card teams must be')) : errs;
@@ -197,13 +219,14 @@ const GL = l => /^[A-Z]\d*$/.test(String(l)) ? String(l.charCodeAt(0) - 64 + 26 
 // A group's name: "Group 3"; "Grand Final" when the final is one group; "Final · Group 2" when the admin chose a bigger final.
 // short: "Final" / "Final G2" for tight spots.
 function gName(st, g, short) {
+  if (g.name) return g.name;
   if (!st.final) return 'Group ' + GL(g.label);
   if (st.groups.length <= 1) return short ? 'Final' : st.name;
   return (short ? 'Final G' : st.name + ' · Group ') + (st.groups.indexOf(g) + 1);
 }
 // Grand Final ranking: one group → its table; several groups → every finalist ranked together on total points.
 function finalRows(st) {
-  return st.groups.length === 1 ? rowsOf(st.groups[0]) : E.standings(st.groups.flatMap(g => g.teamIds), st.groups.flatMap(groupResults));
+  return units(st).length === 1 ? rowsOf(units(st)[0]) : E.standings(st.groups.flatMap(g => g.teamIds), st.groups.flatMap(groupResults));
 }
 // Real match dates: a stage starts the day after the previous one ends, unless the admin set its own start date.
 function stageStart(st) {
@@ -231,22 +254,24 @@ const mapOf = m => mapShown(m) ? m.map : 'Map TBA';
 const RULES_MATCH = ['Check in on My Team before every match', 'Room ID and password appear 15 minutes before the start', 'Join with your slot number. Late teams get 0 points', 'No restart for disconnects', 'Never share room details'];
 const RULES_FAIR = ['Only your 4 registered players may play', 'No hacks, panels, emulators or teaming', 'Complaints within 30 minutes, with a screenshot', "The organiser's decision is final"];
 // Champion Rush needs one room, so only a 12-team (one-group) Grand Final can use it.
-const rushOn = () => S.settings.finalMode === 'rush' && (bracket().path.slice(-1)[0] || E.FINAL_TEAMS) <= E.GROUP_SIZE;
-const rushTarget = () => Math.max(1, Number(S.settings.rushTarget) || 80);
+const rushOn = () => tplOn() ? tplRows().slice(-1)[0].mode === 'rush' : S.settings.finalMode === 'rush' && (bracket().path.slice(-1)[0] || E.FINAL_TEAMS) <= E.GROUP_SIZE;
+const rushTarget = () => Math.max(1, (tplOn() && tplRows().slice(-1)[0].rushTarget) || Number(S.settings.rushTarget) || 80);
 // Champion Rush: a team that has reached the points target is on "match point"; the first such team to win a Booyah is champion.
 function rushState(g) {
   const tot = {}, target = rushTarget(); let champion = null, wonIn = null;
   g.teamIds.forEach(id => tot[id] = 0);
   for (const m of g.matches) {
-    if (m.resultStatus !== 'approved' || !m.results) continue;
+    if (!mDone(m) || !m.results) continue;
     if (!champion) { const w = Object.keys(m.results).find(id => m.results[id].place === 1 && !m.results[id].noShow); if (w && tot[w] >= target) { champion = w; wonIn = m.no; } }
     for (const id of Object.keys(m.results)) { const r = m.results[id]; if (!r.noShow) tot[id] = (tot[id] || 0) + E.matchPoints(r.place, r.kills); }
   }
   return { champion, wonIn, target, matchPoint: g.teamIds.filter(id => tot[id] >= target) };
 }
 function rowsOf(g) {
+  const st = S.stages.find(x => x.groups.includes(g) || (x.pools && x.pools.includes(g)));
+  if (st && st.kind === 'cs') return E.csRows(g.teamIds, groupResults(g), st.bestOf);
+  if (st && st.pools && st.pools.includes(g)) return E.standings(g.teamIds, lobbiesOf(st, g).flatMap(groupResults));
   const rows = E.standings(g.teamIds, groupResults(g));
-  const st = S.stages.find(x => x.groups.includes(g));
   if (!st || !st.final || !rushOn()) return rows;
   const c = rushState(g).champion; if (!c) return rows;
   const i = rows.findIndex(r => r.teamId === c); if (i > 0) rows.unshift(rows.splice(i, 1)[0]);
@@ -260,12 +285,8 @@ function qualifiersOf(stage) {
   // As many teams as the admin's count for the next stage (minus the Wild Cards joining there):
   // all 1st places (best points first), then all 2nd places … then, if the count isn't a whole Top N, the best next-placed teams.
   syncTargets();
-  const target = stage.toNext ?? stage.topN * stage.groups.length;
-  const rows = stage.groups.map(g => rowsOf(g)), seeded = [];
-  const order = (a, b) => b.points - a.points || b.booyahs - a.booyahs || b.placePts - a.placePts || b.kills - a.kills;
-  for (let r = 0; r < E.GROUP_SIZE && seeded.length < target; r++)
-    rows.map(list => list[r]).filter(Boolean).sort(order).forEach(x => { if (seeded.length < target) seeded.push(x.teamId); });
-  return seeded;
+  const target = stage.toNext ?? stage.topN * units(stage).length;
+  return E.qualifyFromUnits(units(stage).map(u => rowsOf(u)), target);
 }
 
 function buildStage(index, teamIds, mode) {
@@ -286,12 +307,13 @@ function buildStage(index, teamIds, mode) {
   return stage;
 }
 function makeMatches(stage) {
-  const n = stage.matchCount || (stage.final ? E.FINAL_MATCHES : E.MATCHES), half = Math.ceil(n / 2);
+  const cs = stage.kind === 'cs', n = cs ? stage.bestOf || 1 : stage.matchCount || (stage.final ? E.FINAL_MATCHES : E.MATCHES), half = Math.ceil(n / 2);
   stage.groups.forEach((g, gi) => {
     g.matches = Array.from({ length: n }, (_, i) => {
-      const day = stage.final ? (i < half ? 1 : 2) : 1 + Math.floor(gi / 4);
-      const k = stage.final ? i % half : i;
-      const mins = 18 * 60 + k * 40;
+      // Paired lobbies share teams, so each plays on its own day; a ClashSquad pair plays its games 30 minutes apart.
+      const day = stage.pools ? 1 + gi : cs ? 1 : stage.final ? (i < half ? 1 : 2) : 1 + Math.floor(gi / 4);
+      const k = cs ? i : stage.final ? i % half : i;
+      const mins = 18 * 60 + k * (cs ? 30 : 40);
       return { id: 'm' + stage.index + '-' + gi + '-' + i, no: i + 1, map: MAPS[i % MAPS.length], day, time: `${(Math.floor(mins / 60) - 12)}:${String(mins % 60).padStart(2, '0')} PM`,
         status: 'scheduled', roomId: '', roomPass: '', checkins: [], results: null, resultStatus: 'none', screenshots: [] };
     });
@@ -309,20 +331,123 @@ function loadDemoTournament() {
     const last = k === 2 || st.final;
     st.groups.forEach(g => { const upto = last ? Math.floor(g.matches.length / 2) : g.matches.length;
       g.matches.forEach((m, i) => { if (i < upto) Object.assign(m, { checkins: g.teamIds.slice(), results: randomResults(g.teamIds), status: 'completed', screenshots: ['simulated.png'], resultStatus: 'approved' }); }); });
-    if (last) { const m = st.groups[0].matches.find(x => x.resultStatus !== 'approved'); if (m) m.status = 'live'; break; }
+    if (last) { const m = st.groups[0].matches.find(x => !mDone(x)); if (m) m.status = 'live'; break; }
     st.qualified = qualifiersOf(st); st.status = 'done';
     S.stages.push(buildStage(k + 1, st.qualified, 'seeded'));
   }
+}
+// ---------- template stages ----------
+// Can this template stage be generated now? Stages are created in template order; a stage needs its feeding stages finished.
+function tplBlocked(ps) {
+  if (S.stages.length !== ps.index) return S.stages.length > ps.index ? 'already generated' : 'generate the stages before it first';
+  const waiting = ps.from.map(stageByKey).find(st => !st || st.status !== 'done');
+  if (ps.from.length && waiting !== undefined) { const k = ps.from.find(k => { const st = stageByKey(k); return !st || st.status !== 'done'; });
+    return `finish ${tplDef().stages.find(d => d.key === k).name} first (approve its qualifiers)`; }
+  const probs = formatProblems(); if (probs.length) return 'the team numbers need fixing in Settings: ' + probs[0];
+  if (ps.entry === 'slots') { const n = approvedSlotCount(); if (n < ps.entering) return `${ps.entering} approved registered teams are needed (${n} now)`; }
+  const wcNeed = ps.entry === 'wc' ? ps.entering : ps.wcJoin, wcHave = unplacedWc().length;
+  if (wcNeed > wcHave) return `${wcNeed} approved Wild Card teams are needed for this stage (${wcHave} available). Add them on the Wild Cards page`;
+  return '';
+}
+// Build a template stage: registered teams (entry stage), Wild Card teams (Wild Card entry stage) or the qualifiers of
+// the stages feeding it, plus the Wild Cards joining here (they wait in the tray until placed).
+function buildTplStage(ps, mode) {
+  let ids, wcIds = [];
+  if (ps.entry === 'slots') ids = slotTeams().filter(t => t.status === 'approved').sort((a, b) => a.slotNo - b.slotNo).map(t => t.id).slice(0, ps.entering);
+  else if (ps.entry === 'wc') ids = unplacedWc().slice(0, ps.entering).map(t => t.id);
+  else {
+    // Qualifiers from several stages: take them in turn (1st of each list, then 2nd …) so the seeding stays fair.
+    const lists = ps.from.map(k => (stageByKey(k).qualified || []).slice()); ids = [];
+    while (lists.some(l => l.length)) lists.forEach(l => { if (l.length) ids.push(l.shift()); });
+    wcIds = unplacedWc().slice(0, ps.wcJoin).map(t => t.id);
+  }
+  const n = ps.units, size = ps.unitSize, cap = Array(n).fill(size);
+  let left = wcIds.length, g = 0; while (left > 0) { if (cap[g] > 0) { cap[g]--; left--; } g = (g + 1) % n; }
+  let alloc = null;
+  if (ps.seed === 'pairs') { const src = stageByKey(ps.from[0]), a = E.pairsAllocate(src.qualifiedBy || [], ps.pairs || []);
+    if (a.length === n && a.every((x, i) => x.length <= cap[i]) && a.flat().length === ids.length) alloc = a; }
+  if (!alloc) {
+  if (ps.seed === 'tiers') alloc = E.sequentialAllocate(ids, cap);
+  else alloc = mode === 'random' ? E.sequentialAllocate(E.shuffle(ids), cap) : mode === 'sequential' || ps.kind === 'cs' ? E.sequentialAllocate(ids, cap) : E.snakeAllocate(ids, cap);
+  }
+  // Template group names (A, B, C · Phase 1 · T1 · A vs B); more groups than the template names continue the pattern.
+  const tplLabel = gi => { const L = ps.labels; if (!L) return null; if (L[gi]) return L[gi];
+    const f = L[0]; return /^[A-Z]$/.test(f) ? String.fromCharCode(65 + gi) : /^(.*?)(\d+)$/.test(f) ? f.replace(/\d+$/, String(gi + 1)) : 'Group ' + (gi + 1); };
+  const label = gi => ps.kind === 'cs' ? (ps.final ? 'Final' : 'Pair ' + (gi + 1)) : ps.labels ? tplLabel(gi) : n === 1 ? (ps.final ? 'Final' : '1') : String(gi + 1);
+  const name = gi => { if (ps.kind === 'cs') return ps.final ? ps.name : 'Pair ' + (gi + 1); if (!ps.labels) return n === 1 ? ps.name : 'Group ' + (gi + 1);
+    const l = tplLabel(gi); return /^[A-Z]$/.test(l) ? 'Group ' + l : l.replace(/^T(\d+)$/, 'Tier $1'); };
+  const list = alloc.map((teamIds, gi) => ({ label: label(gi), name: name(gi), teamIds, matches: [] }));
+  const stage = { index: ps.index, tpl: ps.key, path: ps.path, kind: ps.kind, name: ps.name, final: ps.final, status: 'draft', entering: ps.entering, wcJoin: 0, wcIn: wcIds.length + (ps.entry === 'wc' ? ids.length : 0),
+    topN: ps.topN, extra: ps.extra, toNext: ps.advancing, matchCount: ps.matches, bestOf: ps.bestOf, unitSize: size, wcTray: wcIds, sizes: cap, groups: [] };
+  if (ps.kind === 'paired') stage.pools = list; else stage.groups = list;
+  return stage;
+}
+// Wild Cards in the tray go to the emptiest group (or ClashSquad pair) of the stage.
+function autoPlaceWc(st) {
+  st.wcTray.slice().forEach(id => { const g = units(st).reduce((a, b) => b.teamIds.length < a.teamIds.length ? b : a); if (g.teamIds.length < unitSize(st)) { g.teamIds.push(id); st.wcTray = st.wcTray.filter(x => x !== id); log('Wild Card placed', team(id).name + ' → ' + gName(st, g)); } });
+}
+// Publish a stage: every group full, then the matches. Returns a problem, or ''.
+function publishStage(st) {
+  const size = unitSize(st), off = units(st).find(g => g.teamIds.length !== size);
+  if (off) return `Every group needs exactly ${size} teams: ${gName(st, off)} has ${off.teamIds.length}`;
+  if (st.pools) st.groups = E.pairLobbies(st.pools.length).map(([a, b]) => ({ label: st.pools[a].label + st.pools[b].label, name: (st.pools[a].name || '') .replace(/^Group /, '') + ' vs ' + (st.pools[b].name || '').replace(/^Group /, ''), pools: [a, b], teamIds: [...st.pools[a].teamIds, ...st.pools[b].teamIds], matches: [] }));
+  makeMatches(st); st.status = 'published';
+  units(st).forEach(u => u.teamIds.forEach((id, i) => { const g = st.groups.find(x => x.teamIds.includes(id)), m = g.matches[0];
+    notify(id, 'group', st.index, `${S.settings.name} · ${st.name}: you are in ${st.final && !st.pools ? gName(st, u) : gName(st, u)}, Slot ${g.teamIds.indexOf(id) + 1}. First match ${matchDate(st, m)}, ${m.time} (${m.map}). Check in on My Team before each match.`); }));
+  log(st.name + ' published', units(st).length + (st.kind === 'cs' ? ' pairs' : ' groups')); return '';
+}
+// ClashSquad: a random game (one team to 4 rounds) and, once a pair is decided, its remaining games are not played.
+function randomCs(teamIds) { const w = Math.random() < .5 ? 0 : 1, res = {}; teamIds.forEach((id, i) => { res[id] = { rounds: i === w ? E.CS_ROUNDS : Math.floor(Math.random() * E.CS_ROUNDS), kills: Math.floor(Math.random() * 12) }; }); return res; }
+function csSettle(st, g) {
+  if (st.kind !== 'cs') return;
+  // A corrected game can change who leads: bring back skipped games, then skip again only what is still not needed.
+  g.matches.forEach(m => { if (m.resultStatus === 'skipped') Object.assign(m, { status: 'scheduled', resultStatus: 'none' }); });
+  if (!E.csTie(g.teamIds, groupResults(g), st.bestOf).decided) return;
+  g.matches.forEach(m => { if (!mDone(m)) Object.assign(m, { status: 'skipped', resultStatus: 'skipped', results: null, roomId: '', roomPass: '' }); });
+}
+// Simulate results (all, or the first half of each group's matches for a demo).
+function simulateStage(st, half) {
+  st.groups.forEach(g => { const upto = half ? Math.floor(g.matches.length / 2) : g.matches.length;
+    g.matches.forEach((m, i) => { if (i < upto && !mDone(m)) Object.assign(m, { checkins: g.teamIds.slice(), results: st.kind === 'cs' ? randomCs(g.teamIds) : randomResults(g.teamIds), status: 'completed', screenshots: ['simulated.png'], resultStatus: 'approved' }); csSettle(st, g); }); });
+}
+// Approve the qualifiers (or finish the tournament) and tell every team.
+function qualifyStage(st) {
+  st.qualified = st.final ? [] : qualifiersOf(st); st.status = 'done';
+  st.qualifiedBy = units(st).map(u => st.qualified.filter(id => u.teamIds.includes(id)));
+  if (st.final) finalRows(st).forEach(r => notify(r.teamId, 'result', st.index, `${S.settings.name} ${st.name}: you finished #${r.rank}${st.kind === 'cs' ? '' : ' with ' + r.points + ' points'}.${r.rank === 1 ? ' 🏆 Champions!' : ''}`));
+  else units(st).forEach(u => rowsOf(u).forEach(r => notify(r.teamId, 'result', st.index,
+    st.qualified.includes(r.teamId) ? `${S.settings.name} · ${st.name}: QUALIFIED ✅ (rank #${r.rank} in ${gName(st, u)}${st.kind === 'cs' ? '' : ', ' + r.points + ' pts'}). Next stage groups coming soon.`
+      : `${S.settings.name} · ${st.name}: eliminated (rank #${r.rank} in ${gName(st, u)}${st.kind === 'cs' ? '' : ', ' + r.points + ' pts'}). Thanks for playing!`)));
+  log(st.final ? 'Tournament finished' : st.name + ' qualifiers approved', st.final ? '' : st.qualified.length + ' teams');
+}
+// Demo for a template: sample teams for its numbers, then each stage generated, played and closed up to a live stage.
+const TPL_LIVE = { rbz: 's4', winter: 'wz', tvk: 'qf' };
+function loadDemoTemplate(key) {
+  const keep = S.settings, tpl = E.TEMPLATES[key], rows = E.tplPlan(tpl, {}), wc = rows.reduce((a, r) => a + (r.wcJoin || 0), 0);
+  loadSample(rows.find(r => r.entry === 'slots').entering, wc);
+  if (Cloud.on) S.settings = keep;
+  Object.assign(S.settings, { template: key, tplCounts: {}, slots: rows.find(r => r.entry === 'slots').entering, wildCards: wc, finalMode: rows.slice(-1)[0].mode === 'rush' ? 'rush' : 'normal', rushTarget: rows.slice(-1)[0].rushTarget || S.settings.rushTarget, regOpen: false });
+  for (const ps of tplRows()) {
+    const why = tplBlocked(ps); if (why) { toast(ps.name + ': ' + why); break; }
+    const st = buildTplStage(ps, 'sequential'); S.stages.push(st); autoPlaceWc(st);
+    const err = publishStage(st); if (err) { toast(err); break; }
+    const live = ps.key === TPL_LIVE[key];
+    simulateStage(st, live);
+    if (live) { const m = st.groups[0].matches.find(x => !mDone(x)); if (m) m.status = 'live'; break; }
+    qualifyStage(st);
+  }
+  log('Demo tournament loaded', tpl.label);
 }
 function findTeamPlace(teamId) {
   for (let si = S.stages.length - 1; si >= 0; si--) {
     const st = S.stages[si];
     const gi = st.groups.findIndex(g => g.teamIds.includes(teamId));
-    if (gi >= 0) return { stage: st, group: st.groups[gi], slot: st.groups[gi].teamIds.indexOf(teamId) + 1 };
+    if (gi < 0 && st.pools) { const u = st.pools.find(p => p.teamIds.includes(teamId)); if (u) return { stage: st, group: u, slot: u.teamIds.indexOf(teamId) + 1, unit: u }; }
+    if (gi >= 0) return { stage: st, group: st.groups[gi], slot: st.groups[gi].teamIds.indexOf(teamId) + 1, unit: units(st).find(u => u.teamIds.includes(teamId)) || st.groups[gi] };
   }
   return null;
 }
-function allApproved(stage) { return stage.groups.every(g => g.matches.every(m => m.resultStatus === 'approved')); }
+function allApproved(stage) { return stage.groups.every(g => g.matches.every(mDone)); }
 
 // ---------- sample data ----------
 // Sample In Game Names: gamer-tag style, unique, at most 12 characters.
@@ -330,7 +455,7 @@ const TAG = ['Ravi', 'Arun', 'Karthi', 'Vijay', 'Surya', 'Ajith', 'Dinesh', 'Har
 const TAG_STYLE = [n => n + 'FF', n => 'xX' + n, n => n + 'Op', n => 'Pro' + n, n => n + 'YT', n => 'Its' + n, n => n + 'Gg', n => 'Mr' + n];
 const ADJ = ['Thunder', 'Blaze', 'Cobra', 'Storm', 'Ghost', 'Rider', 'Titan', 'Wolf', 'Venom', 'Hawk', 'Viper', 'Joker', 'Shadow', 'Phoenix', 'Raptor', 'Falcon', 'Rogue', 'Inferno', 'Fury', 'Spartan', 'Kraken', 'Nova', 'Reaper', 'Panther', 'Sniper', 'Dragon', 'Bullet', 'Ninja', 'Legend', 'Alpha'];
 const NOUN = ['Squad', 'Army', 'Gaming', 'Esports', 'Clan', 'Force', 'Kings', 'Gang', 'Boys', 'Unit', 'Crew', 'X'];
-function loadSample() {
+function loadSample(slots = 252, wcCount = 12) {
   S = fresh(); S.settings = Object.assign({}, S.settings);
   let mob = 9000000000, uid = 612340000, k = 0;  // dummy UIDs start at 6123…, away from Team Thunder's 5123… UIDs
   const mk = (name, entry) => {
@@ -348,9 +473,10 @@ function loadSample() {
     { name: 'THxKarthik', mobile: '9876543212', email: 'karthik@mail.in', uid: '512345680' },
     { name: 'THxVijay', mobile: '9876543213', email: 'vijay@mail.in', uid: '512345681' }];
   thunder.captainMobile = '9876543210';
-  for (let i = 1; i < 252; i++) mk(ADJ[i % ADJ.length] + ' ' + NOUN[Math.floor(i / ADJ.length) % NOUN.length] + (i >= ADJ.length * NOUN.length ? ' ' + i : ''), 'SLOT');
-  ['Creator Kings', 'Stream Legends', 'YT Warriors', 'Live Snipers', 'Insta Rush', 'Shorts Squad', 'Clip Kings', 'Reel Raiders', 'Vlog Vipers', 'Meme Mafia', 'Duo Gamers', 'Fan Army'].forEach(n => mk(n, 'WC'));
-  log('Sample data loaded', '252 slot teams + 12 Wild Cards');
+  for (let i = 1; i < slots; i++) mk(ADJ[i % ADJ.length] + ' ' + NOUN[Math.floor(i / ADJ.length) % NOUN.length] + (i >= ADJ.length * NOUN.length ? ' ' + i : ''), 'SLOT');
+  const WCN = ['Creator Kings', 'Stream Legends', 'YT Warriors', 'Live Snipers', 'Insta Rush', 'Shorts Squad', 'Clip Kings', 'Reel Raiders', 'Vlog Vipers', 'Meme Mafia', 'Duo Gamers', 'Fan Army'];
+  for (let i = 0; i < wcCount; i++) mk(WCN[i % WCN.length] + (i >= WCN.length ? ' ' + (Math.floor(i / WCN.length) + 1) : ''), 'WC');
+  log('Sample data loaded', slots + ' slot teams + ' + wcCount + ' Wild Cards');
   save();
 }
 
@@ -554,16 +680,18 @@ function nextAction(t) {
     if (t.entry === 'WC') { const p = plan(), j = p.find(s => s.wcJoin); return { label: 'Wild Card', main: 'You enter at ' + (j ? j.name : 'a later stage'), sub: 'The admin will place you in a group and slot.' }; }
     return { label: 'Approved ✅', main: 'Groups are being prepared', sub: 'You will see your group and slot here.' };
   }
-  const { stage, group, slot } = place;
+  const { stage, group, slot, unit } = place;
   if (stage.status === 'draft') return { label: stage.name, main: 'Groups are being prepared', sub: '' };
   if (stage.status === 'done') {
-    if (stage.final) { const r = rowsOf(group).find(x => x.teamId === t.id); return { label: stage.name + ' finished', main: r.rank === 1 ? '🏆 Champions!' : 'Final rank: #' + r.rank, sub: r.points + ' points' }; }
+    if (stage.final) { const r = rowsOf(unit).find(x => x.teamId === t.id); return { label: stage.name + ' finished', main: r.rank === 1 ? '🏆 Champions!' : 'Final rank: #' + r.rank, sub: r.points + ' points' }; }
     if ((stage.qualified || []).includes(t.id)) return { label: stage.name + ' finished', main: 'Qualified ✅', sub: 'Next stage groups are being prepared.' };
-    const r = rowsOf(group).find(x => x.teamId === t.id);
-    return { label: stage.name + ' finished', main: 'Eliminated', sub: 'Rank #' + r.rank + ' in Group ' + GL(group.label) + ' · ' + r.points + ' points' };
+    const r = rowsOf(unit).find(x => x.teamId === t.id);
+    return { label: stage.name + ' finished', main: 'Eliminated', sub: 'Rank #' + r.rank + ' in ' + gName(stage, unit) + (stage.kind === 'cs' ? '' : ' · ' + r.points + ' points') };
   }
-  const m = group.matches.find(x => x.resultStatus !== 'approved');
-  const where = `${stage.name} · Group ${GL(group.label)} · Slot ${slot}`;
+  // Next match across every lobby the team plays in (a paired group plays in two lobbies).
+  const mine = stage.groups.filter(x => x.teamIds.includes(t.id)).flatMap(x => x.matches.map(mm => ({ mm, x }))).sort((a, b) => a.mm.day - b.mm.day || a.mm.time.localeCompare(b.mm.time));
+  const nx = mine.find(o => !mDone(o.mm)), m = nx && nx.mm, lob = nx ? nx.x : group;
+  const where = `${stage.name} · ${gName(stage, unit)}${lob !== unit ? ' · ' + gName(stage, lob) : ''} · Slot ${lob.teamIds.indexOf(t.id) + 1}`;
   if (!m) return { label: where, main: 'All matches played', sub: 'Waiting for qualifiers to be approved.' };
   const head = `Match ${m.no} · ${mapOf(m)} · ${matchDate(stage, m)}, ${m.time}`;
   const checked = m.checkins.includes(t.id);
@@ -571,7 +699,7 @@ function nextAction(t) {
   if (!checked && (m.status === 'checkin' || m.status === 'room')) return { label: where, main: head, sub: 'Check in now to see the room details.', action: `<button class="btn" data-act="checkin" data-m="${m.id}" data-t="${t.id}">Check in</button>` };
   if (!checked) return { label: where, main: head, sub: 'You did not check in for this match.' };
   if (m.status === 'checkin') return { label: where, main: head, sub: 'Checked in ✅ Room ID and password will appear here 15 minutes before the start.' };
-  if (m.status === 'room') return { label: where, main: head, sub: 'Join the custom room in Free Fire with your slot number ' + slot + '.',
+  if (m.status === 'room') return { label: where, main: head, sub: 'Join the custom room in Free Fire with your slot number ' + (lob.teamIds.indexOf(t.id) + 1) + '.',
     room: `<div class="room"><div><span>Room ID</span><b>${esc(m.roomId)}</b><button class="btn small ghost" data-act="copy" data-text="${esc(m.roomId)}">Copy</button></div><div><span>Password</span><b>${esc(m.roomPass)}</b><button class="btn small ghost" data-act="copy" data-text="${esc(m.roomPass)}">Copy</button></div></div>` };
   if (m.status === 'live') return { label: where, main: head + ' · LIVE', sub: 'Good luck!' };
   return { label: where, main: 'Match ' + m.no + ' finished', sub: m.resultStatus === 'submitted' ? 'Results are being checked by the admin.' : 'Results will be posted soon.' };
@@ -581,7 +709,7 @@ function viewTeamDash() {
   if (!t) { if (Cloud.on) { Cloud.refreshTeam().then(ok => ok && render()); return '<p class="muted">Loading…</p>'; } session.teamCode = null; save(); return viewMyTeamLogin(); }
   const na = nextAction(t);
   const history = S.stages.map(st => {
-    const g = st.groups.find(g => g.teamIds.includes(t.id)); if (!g) return '';
+    const g = units(st).find(g => g.teamIds.includes(t.id)); if (!g) return '';
     const rows = g.matches.filter(m => m.resultStatus === 'approved').map(m => { const r = m.results[t.id] || {}; return `<tr><td>${m.no}</td><td>${esc(m.map)}</td><td>${r.noShow ? 'No-show' : '#' + r.place}</td><td>${r.noShow ? 0 : r.kills}</td><td><b>${r.noShow ? 0 : E.matchPoints(r.place, r.kills)}</b></td></tr>`; }).join('');
     const me = rowsOf(g).find(x => x.teamId === t.id);
     return `<h3 style="margin-top:16px">${st.name} · Group ${GL(g.label)} <span class="muted small">· rank #${me.rank} · ${me.points} pts</span></h3>
@@ -614,7 +742,7 @@ function myPath(t) {
   const p = plan();
   const steps = p.map((ps, i) => {
     const st = S.stages[i];
-    const g = st && st.groups.find(x => x.teamIds.includes(t.id));
+    const g = st && units(st).find(x => x.teamIds.includes(t.id));
     if (!st || st.status === 'draft') return { name: ps.name, state: 'next', txt: 'Coming up' };
     if (!g) return { name: ps.name, state: 'out', txt: '—' };
     const r = rowsOf(g).find(x => x.teamId === t.id);
@@ -638,12 +766,12 @@ function teamWaCard(t) {
 }
 function statCards(t) {
   const pl = findTeamPlace(t.id); if (!pl) return '';
-  const all = S.stages.flatMap(st => st.groups.filter(g => g.teamIds.includes(t.id)).map(g => rowsOf(g).find(r => r.teamId === t.id)));
+  const all = S.stages.flatMap(st => units(st).filter(g => g.teamIds.includes(t.id)).map(g => rowsOf(g).find(r => r.teamId === t.id)));
   const sum = k => all.reduce((a, r) => a + r[k], 0);
-  const me = rowsOf(pl.group).find(r => r.teamId === t.id);
+  const me = rowsOf(pl.unit || pl.group).find(r => r.teamId === t.id);
   const ic = d => `<svg class="sicon" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
   return `<div class="grid g4" style="margin-top:14px">
-    <div class="card stat">${ic('M7 3h10v3a5 5 0 0 1-4 4.9V14h3v2H8v-2h3v-3.1A5 5 0 0 1 7 6zm-4 1h3v2a3 3 0 0 0 1 2.2A4 4 0 0 1 3 6zm18 0v2a4 4 0 0 1-4 2.2A3 3 0 0 0 18 6V4zM6 18h12v3H6z')}<b>#${me.rank}</b><span>Rank in ${gName(pl.stage, pl.group)}</span></div>
+    <div class="card stat">${ic('M7 3h10v3a5 5 0 0 1-4 4.9V14h3v2H8v-2h3v-3.1A5 5 0 0 1 7 6zm-4 1h3v2a3 3 0 0 0 1 2.2A4 4 0 0 1 3 6zm18 0v2a4 4 0 0 1-4 2.2A3 3 0 0 0 18 6V4zM6 18h12v3H6z')}<b>#${me.rank}</b><span>Rank in ${gName(pl.stage, pl.unit || pl.group)}</span></div>
     <div class="card stat">${ic('M12 2l2.9 6.9L22 9.3l-5.5 4.7L18.2 21 12 17.3 5.8 21l1.7-7L2 9.3l7.1-.4z')}<b>${me.points}</b><span>${esc(pl.stage.name)} points</span></div>
     <div class="card stat">${ic('M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 17.9V17h-2v2.9A8 8 0 0 1 4.1 13H7v-2H4.1A8 8 0 0 1 11 4.1V7h2V4.1A8 8 0 0 1 19.9 11H17v2h2.9A8 8 0 0 1 13 19.9zM12 10a2 2 0 1 0 2 2 2 2 0 0 0-2-2z')}<b>${sum('kills')}</b><span>Total kills</span></div>
     <div class="card stat">${ic('M18 2H6v2H2v3a4 4 0 0 0 4 4h.3A6 6 0 0 0 11 14.9V18H8v2h8v-2h-3v-3.1a6 6 0 0 0 4.7-3.9H18a4 4 0 0 0 4-4V4h-4zM4 7V6h2v3a2 2 0 0 1-2-2zm16 0a2 2 0 0 1-2 2V6h2z')}<b>${sum('booyahs')}</b><span>Booyahs</span></div></div>
@@ -708,7 +836,7 @@ function viewOverview() {
   const st = curStage();
   const ms = allMatches();
   const live = ms.filter(x => x.m.status === 'live');
-  const upcoming = ms.filter(x => x.st.status === 'published' && x.m.resultStatus !== 'approved' && x.m.status !== 'live').slice(0, 6);
+  const upcoming = ms.filter(x => x.st.status === 'published' && !mDone(x.m) && x.m.status !== 'live').slice(0, 6);
   const recent = ms.filter(x => x.m.resultStatus === 'approved').slice(-4).reverse();
   const matchCard = ({ st, g, m }) => {
     const top = m.results ? Object.entries(m.results).filter(([, r]) => r.place === 1)[0] : null;
@@ -755,13 +883,15 @@ function bracketCols() {
   p.forEach((ps, i) => {
     const st = S.stages[i];
     if (!st || st.status === 'draft') { cols.push({ name: ps.name, final: ps.final, tbd: true, count: ps.sizes.length, wc: ps.wcJoin }); return; }
-    const groups = st.groups.map(g => {
+    const groups = units(st).map(g => {
       const rows = rowsOf(g);
-      const played = g.matches.filter(m => m.resultStatus === 'approved').length;
+      // A paired group's matches are in its two lobbies.
+      const ms = lobbiesOf(st, g).flatMap(x => x.matches).sort((a, b) => a.day - b.day || a.time.localeCompare(b.time));
+      const played = ms.filter(m => m.resultStatus === 'approved').length;
       const shown = st.status === 'done' && !st.final ? rows.filter(r => (st.qualified || []).includes(r.teamId)) : rows;
-      const days = [...new Set(g.matches.map(m => m.day))];
-      return { label: gName(st, g), rows: shown, all: rows, played, total: g.matches.length, mine: g.teamIds.includes(me),
-        when: (days.length > 1 ? matchDate(st, g.matches[0]) + ' – ' + matchDate(st, g.matches[g.matches.length - 1]) : matchDate(st, g.matches[0])) + ', ' + g.matches[0].time, idx: st.groups.indexOf(g) };
+      const days = [...new Set(ms.map(m => m.day))];
+      return { label: gName(st, g), rows: shown, all: rows, played, total: ms.length, mine: g.teamIds.includes(me),
+        when: !ms.length ? '' : (days.length > 1 ? matchDate(st, ms[0]) + ' – ' + matchDate(st, ms[ms.length - 1]) : matchDate(st, ms[0])) + ', ' + ms[0].time, idx: units(st).indexOf(g) };
     });
     cols.push({ name: st.name, final: st.final, done: st.status === 'done', groups, wc: st.wcJoin || 0 });
   });
@@ -792,9 +922,9 @@ function viewColBracket() {
     const head = `${esc(ps.name)} <em>(${ps.final ? 'MT ' + mt : 'Top ' + topN + ' · MT ' + mt})</em>`;
     let boxes = '';
     if (b) {
-      const list = b.groups.map((g, gi) => ({ g, gi, rows: rowsOf(g) }));
+      const list = units(b).map((g, gi) => ({ g, gi, rows: rowsOf(g) }));
       const hit = list.filter(x => (me && x.g.teamIds.includes(me)) || (q && x.g.teamIds.some(id => (team(id)?.name || '').toLowerCase().includes(q))));
-      const pick = (hit.length ? hit.concat(list.filter(x => !hit.includes(x))) : list).slice(0, ps.final ? b.groups.length : MAXBOX);
+      const pick = (hit.length ? hit.concat(list.filter(x => !hit.includes(x))) : list).slice(0, ps.final ? units(b).length : MAXBOX);
       const show = ps.final ? 12 : Math.min(3, topN || 3);
       boxes = pick.map(({ g, gi, rows }) => {
         const done = g.matches.filter(m => m.resultStatus === 'approved').length;
@@ -802,7 +932,7 @@ function viewColBracket() {
         const extra = me && !top.some(r => r.teamId === me) && rows.find(r => r.teamId === me);
         const line = (r) => { const q2 = !ps.final && r.rank <= topN, mine = r.teamId === me; return `<div class="cb-row${mine ? ' me' : ''}${q && (team(r.teamId)?.name || '').toLowerCase().includes(q) ? ' hit' : ''}"><span class="cb-seed">${r.rank}</span>${tname(r.teamId)}<b class="${q2 || (ps.final && r.rank === 1 && b.status === 'done') ? 'on' : ''}">${done ? r.points : '–'}</b></div>`; };
         return `<div class="cb-box"><span class="cb-no">${ps.final ? '★' : gi + 1}</span><a class="cb-h" href="#/leaderboard?stage=${i}">${gName(b, g)} <span>${done}/${g.matches.length}</span></a>${top.map(line).join('')}${extra ? '<div class="cb-gap">⋯</div>' + line(extra) : ''}${!ps.final && g.teamIds.length > show ? `<div class="cb-more">+${g.teamIds.length - show} more teams</div>` : ''}</div>`;
-      }).join('') + (!ps.final && b.groups.length > MAXBOX ? `<a class="cb-all" href="#/bracket?phase=${i}">Show all ${b.groups.length} groups →</a>` : '');
+      }).join('') + (!ps.final && units(b).length > MAXBOX ? `<a class="cb-all" href="#/bracket?phase=${i}">Show all ${units(b).length} groups →</a>` : '');
     } else {
       const n = Math.min(ps.final ? 1 : ps.sizes.length, ps.final ? 1 : 4);
       boxes = Array.from({ length: n }, (_, k) => `<div class="cb-box tbd"><span class="cb-no">${ps.final ? '★' : k + 1}</span><div class="cb-h">${ps.final ? (ps.sizes.length > 1 ? esc(ps.name) + ' · Group ' + (k + 1) : esc(ps.name)) : 'Group ' + (k + 1)} <span>TBD</span></div>${'<div class="cb-row"><span class="cb-seed">–</span><span class="muted">To be decided</span><b>–</b></div>'.repeat(2)}</div>`).join('') + (!ps.final && ps.sizes.length > n ? `<div class="cb-more">+${ps.sizes.length - n} more groups</div>` : '');
@@ -816,7 +946,7 @@ function viewRoadmap(admin) {
   const p = plan();
   const rows = p.map((ps, i) => {
     const b = S.stages[i], live = b && b.status === 'published', done = b && b.status === 'done';
-    const entering = b ? b.entering : ps.entering, groups = b ? b.groups.length : ps.sizes.length;
+    const entering = b ? b.entering : ps.entering, groups = b ? units(b).length : ps.sizes.length;
     const mt = b ? (b.matchCount || ps.matches) : ps.matches, topN = ps.topN, extra = ps.extra || 0;
     const adv = b && done && !ps.final ? (b.qualified || []).length : ps.advancing;
     const state = done ? ['Completed', 'b-ok'] : live ? ['Live', 'b-bad'] : b ? ['Draft', 'b-warn'] : ['Coming up', ''];
@@ -874,10 +1004,10 @@ function viewWcRoute() {
 function viewPools(st) {
   const q = bracketQuery.trim().toLowerCase(), me = myTeamId(), next = S.stages[st.index + 1];
   const statusOf = g => { const d = g.matches.filter(m => m.resultStatus === 'approved').length; return st.status === 'draft' ? ['Upcoming', ''] : d === g.matches.length ? ['Complete', 'b-ok'] : d ? ['In progress', 'b-acc'] : ['Not started', '']; };
-  const groups = st.groups.filter(g => !q || g.teamIds.some(id => (team(id)?.name || '').toLowerCase().includes(q)));
+  const groups = units(st).filter(g => !q || g.teamIds.some(id => (team(id)?.name || '').toLowerCase().includes(q)));
   const adv = st.final ? 'Final ranking' : `Top ${st.topN}/group${st.extra ? ` + ${st.extra} best ${ordinal(st.topN + 1)}` : ''} → ${next ? esc(next.name) : 'next stage'}`;
   return `<div class="card glass ph-head"><div class="row between"><div><h2 style="margin:0">${esc(st.name)}</h2>
-      <div class="ph-facts"><span>${st.groups.length} group${st.groups.length > 1 ? 's' : ''}</span><span>${st.entering} teams</span>${st.wcJoin ? `<span>incl. ${st.wcJoin} Wild Cards</span>` : ''}<span>${adv}</span></div></div>
+      <div class="ph-facts"><span>${units(st).length} group${units(st).length > 1 ? 's' : ''}</span><span>${st.entering} teams</span>${st.wcJoin ? `<span>incl. ${st.wcJoin} Wild Cards</span>` : ''}<span>${adv}</span></div></div>
       <span class="badge ${st.status === 'done' ? 'b-ok' : st.status === 'published' ? 'b-acc' : ''}">${st.status === 'done' ? 'Complete' : st.status === 'published' ? 'Live' : 'Upcoming'}</span></div></div>
     ${groups.length ? groups.map(g => {
       const rows = rowsOf(g), [sl, sc] = statusOf(g);
@@ -987,7 +1117,7 @@ function viewGroups() {
   const st = pickStage();
   if (!st || st.status === 'draft') return `<h1>Groups</h1><p class="muted">Groups are not published yet.</p>${st ? stagePicker('groups') : ''}`;
   return `<h1>Groups</h1><p class="sub">${st.name} · ${st.entering} teams</p>${stagePicker('groups')}
-  <div class="grid g4">${st.groups.map(g => `<div class="groupcard"><h3>Group ${GL(g.label)} <span class="muted small">${g.teamIds.length} teams</span></h3><ol>${g.teamIds.map(id => `<li>${tname(id)}</li>`).join('')}</ol></div>`).join('')}</div>`;
+  <div class="grid g4">${units(st).map(g => `<div class="groupcard"><h3>${g.name ? esc(g.name) : 'Group ' + GL(g.label)} <span class="muted small">${g.teamIds.length} teams</span></h3><ol>${g.teamIds.map(id => `<li>${tname(id)}</li>`).join('')}</ol></div>`).join('')}</div>`;
 }
 function viewSchedule() {
   const st = pickStage();
@@ -999,7 +1129,7 @@ function viewSchedule() {
 // Public: the result of one finished match (opened from Schedule → Check result).
 function viewMatchResult(id) {
   const fm = findMatch(id);
-  if (!fm || fm.m.resultStatus !== 'approved' || !fm.m.results) return `<a class="small" href="#/schedule">← Schedule</a><h1>Match result</h1><p class="muted">This result is not published yet.</p>`;
+  if (!fm || !mDone(fm.m) || !fm.m.results) return `<a class="small" href="#/schedule">← Schedule</a><h1>Match result</h1><p class="muted">This result is not published yet.</p>`;
   const { st, g, m } = fm;
   return `<a class="small" href="#/schedule?stage=${S.stages.indexOf(st)}">← Schedule</a>
   <h1>${esc(st.name)} · ${gName(st, g, 1)} · Match ${m.no}</h1><p class="sub">${esc(m.map)} · ${matchDate(st, m)}, ${m.time}</p>
@@ -1009,7 +1139,14 @@ function viewMatchResult(id) {
 const pname = (teamId, p) => p.sub ? p.name : (team(teamId)?.players[p.slot]?.name || p.name);
 // One table per match: each team with its players under it (Pos, Team and the team totals span the team's player rows).
 // admin adds the registered UID and how each name was checked.
+// A ClashSquad game: each team's rounds and kills, winner first.
+function csResultTable(m) {
+  const fm = findMatch(m.id), ids = fm ? fm.g.teamIds : Object.keys(m.results || {}), w = E.csGame(m.results || {}, ids).winner;
+  return `<div class="tw"><table><thead><tr><th>Team</th><th>Rounds won</th><th>Kills</th><th>Result</th></tr></thead><tbody>${ids.slice().sort((a, b) => (b === w) - (a === w)).map(id => { const r = (m.results || {})[id] || {};
+    return `<tr class="${id === w ? 'q' : ''}"><td>${tname(id)}</td><td>${r.rounds ?? '–'}</td><td>${r.kills ?? 0}</td><td><b>${id === w ? 'Won' : 'Lost'}</b></td></tr>`; }).join('')}</tbody></table></div>`;
+}
 function resultTable(m, admin) {
+  { const fm = findMatch(m.id); if (fm && fm.st.kind === 'cs') return csResultTable(m); }
   const order = Object.entries(m.results || {}).sort((a, b) => (a[1].noShow ? 99 : a[1].place) - (b[1].noShow ? 99 : b[1].place));
   const pc = admin ? 4 : 2;
   const body = order.map(([tid, r]) => {
@@ -1051,7 +1188,7 @@ function dashResults() {
 function matchBadge(m) {
   if (m.resultStatus === 'approved') return '<span class="badge b-ok">Result published</span>';
   if (m.resultStatus === 'submitted') return '<span class="badge b-warn">Result checking</span>';
-  const map = { scheduled: ['', 'Scheduled'], checkin: ['b-acc', 'Check-in open'], room: ['b-acc', 'Room released'], live: ['b-bad', 'LIVE'], completed: ['b-warn', 'Completed'] };
+  const map = { skipped: ['', 'Not needed'], scheduled: ['', 'Scheduled'], checkin: ['b-acc', 'Check-in open'], room: ['b-acc', 'Room released'], live: ['b-bad', 'LIVE'], completed: ['b-warn', 'Completed'] };
   const [c, l] = map[m.status] || ['', m.status];
   return `<span class="badge ${c}">${l}</span>`;
 }
@@ -1059,7 +1196,10 @@ function matchBadge(m) {
 let lbOpen = new Set();
 const BOOYAH = '<img class="boo-ic" src="booyah.png" alt="Booyahs" title="Booyahs">';
 function matchBreakdown(g, teamId, cols) {
-  const done = g.matches.filter(m => m.resultStatus === 'approved');
+  const bst = S.stages.find(x => x.groups.includes(g) || (x.pools && x.pools.includes(g)));
+  const done = (bst ? lobbiesOf(bst, g).filter(x => x.teamIds.includes(teamId)).flatMap(x => x.matches) : g.matches).filter(m => m.resultStatus === 'approved' && m.results);
+  if (bst && bst.kind === 'cs') return `<tr class="lb-detail"><td colspan="${cols}">${done.length ? `<table class="mini"><thead><tr><th>Game</th><th>Rounds</th><th>Kills</th><th>Result</th></tr></thead><tbody>${done.map(m => { const r = m.results[teamId] || {}, w = E.csGame(m.results, g.teamIds).winner;
+    return `<tr${w === teamId ? ' class="boo"' : ''}><td>Game ${m.no}</td><td>${r.rounds ?? 0}–${(m.results[g.teamIds.find(x => x !== teamId)] || {}).rounds ?? 0}</td><td>${r.kills ?? 0}</td><td><b>${w === teamId ? 'Won' : 'Lost'}</b></td></tr>`; }).join('')}</tbody></table>` : '<span class="muted small">No games played yet.</span>'}</td></tr>`;
   if (!done.length) return `<tr class="lb-detail"><td colspan="${cols}"><span class="muted small">No approved matches yet.</span></td></tr>`;
   return `<tr class="lb-detail"><td colspan="${cols}"><table class="mini"><thead><tr><th>Match</th><th>Map</th><th>Position</th><th>Pos pts</th><th>Kills</th><th>Total</th></tr></thead><tbody>
     ${done.map(m => { const r = m.results[teamId]; if (!r) return `<tr><td>M${m.no}</td><td>${esc(m.map)}</td><td colspan="4" class="muted">Not in this match</td></tr>`;
@@ -1074,33 +1214,35 @@ function lbRow(stage, g, r, rank, cls, withGroup) {
     ${open ? matchBreakdown(g, r.teamId, cols) : ''}`;
 }
 function standingsTable(stage, g) {
-  const rows = rowsOf(g);
-  const done = g.matches.filter(m => m.resultStatus === 'approved').length, waiting = g.matches.filter(m => m.resultStatus === 'submitted').length;
-  return `<div class="card lb"><div class="row between"><h3>${gName(stage, g)}</h3><span class="muted small">${done}/${g.matches.length} matches${waiting ? ` · ${waiting} result${waiting > 1 ? 's' : ''} being checked` : ''}</span></div>
+  const rows = rowsOf(g), ms = lobbiesOf(stage, g).flatMap(x => x.matches);
+  const done = ms.filter(m => m.resultStatus === 'approved').length, waiting = ms.filter(m => m.resultStatus === 'submitted').length;
+  return `<div class="card lb"><div class="row between"><h3>${gName(stage, g)}</h3><span class="muted small">${done}/${ms.length} ${stage.kind === 'cs' ? 'games' : 'matches'}${waiting ? ` · ${waiting} result${waiting > 1 ? 's' : ''} being checked` : ''}</span></div>
   <div class="tw"><table><thead><tr><th>#</th><th>Team</th><th title="Booyahs">${BOOYAH}</th><th>Pos pts</th><th>Kills</th><th>Total</th></tr></thead><tbody>
   ${rows.map(r => lbRow(stage, g, r, r.rank, `${!stage.final && r.rank <= stage.topN ? 'q' : ''}${stage.final && r.rank <= 3 && stage.status === 'done' ? ' podium p' + r.rank : ''}`, false)).join('')}
   </tbody></table></div></div>`;
 }
 // Every team in the stage, ranked together (points, then tie-breakers).
 function overallRows(st) {
-  return st.groups.flatMap(g => rowsOf(g).map(r => ({ ...r, group: g.label, g })))
+  return units(st).flatMap(g => rowsOf(g).map(r => ({ ...r, group: g.label, g })))
     .sort((a, b) => b.points - a.points || b.booyahs - a.booyahs || b.placePts - a.placePts || b.kills - a.kills);
 }
 function viewLeaderboard() {
   const st = pickStage();
   if (!st || st.status === 'draft') return `<h1>Leaderboard</h1><p class="muted">No published stage yet.</p>`;
   let champ = '';
-  if (st.final && st.status === 'done') { const r = finalRows(st); champ = `<div class="champion"><span class="muted">🏆 Champion</span><b>${esc(team(r[0].teamId).name)}</b><span>${r[0].points} points · 2nd ${esc(team(r[1].teamId).name)} · 3rd ${esc(team(r[2].teamId).name)}</span></div><br>`; }
+  if (st.final && st.status === 'done') { const r = finalRows(st);
+    const sub = st.kind === 'cs' ? `won the final ${r[0].wins}–${r[1] ? r[1].wins : 0}${r[1] ? ' · 2nd ' + esc(team(r[1].teamId).name) : ''}` : `${r[0].points} points${r[1] ? ' · 2nd ' + esc(team(r[1].teamId).name) : ''}${r[2] ? ' · 3rd ' + esc(team(r[2].teamId).name) : ''}`;
+    champ = `<div class="champion"><span class="muted">🏆 Champion</span><b>${esc(team(r[0].teamId).name)}</b><span>${sub}</span></div><br>`; }
   const view = params().view || 'groups';
   const q = `stage=${S.stages.indexOf(st)}`;
-  const toggle = `<div class="seg"><a href="#/leaderboard?${q}&view=groups" class="${view === 'groups' ? 'on' : ''}">${st.groups.length > 1 ? 'By group' : 'Teams'}</a>${st.groups.length > 1 ? `<a href="#/leaderboard?${q}&view=overall" class="${view === 'overall' ? 'on' : ''}">Overall</a>` : ''}<a href="#/leaderboard?${q}&view=players" class="${view === 'players' ? 'on' : ''}">Players</a></div>`;
+  const toggle = `<div class="seg"><a href="#/leaderboard?${q}&view=groups" class="${view === 'groups' ? 'on' : ''}">${units(st).length > 1 ? 'By group' : 'Teams'}</a>${units(st).length > 1 ? `<a href="#/leaderboard?${q}&view=overall" class="${view === 'overall' ? 'on' : ''}">Overall</a>` : ''}<a href="#/leaderboard?${q}&view=players" class="${view === 'players' ? 'on' : ''}">Players</a></div>`;
   const waiting = st.groups.reduce((a, g) => a + g.matches.filter(m => m.resultStatus === 'submitted').length, 0);
   const overall = () => `<div class="card lb"><div class="tw"><table><thead><tr><th>#</th><th>Team</th><th>Group</th><th title="Booyahs">${BOOYAH}</th><th>Pos pts</th><th>Kills</th><th>Total</th></tr></thead><tbody>
     ${overallRows(st).map((r, i) => lbRow(st, r.g, r, i + 1, '', true)).join('')}</tbody></table></div></div>`;
   return `<div class="row between"><div><h1>Leaderboard</h1><p class="sub">${st.name}${st.topN ? ' · highlighted = qualifies' : ' · both final days combined'} · click a team for points per match</p></div>${toggle}</div>${stagePicker('leaderboard')}${champ}
   ${st.final && rushOn() ? (() => { const rs = rushState(st.groups[0]); return `<div class="notice" style="margin-bottom:12px"><b>Champion Rush · target ${rs.target} points.</b> ${rs.champion ? esc(team(rs.champion)?.name || '') + ' won a Booyah on match point in Match ' + rs.wonIn + ' and is the champion.' : rs.matchPoint.length ? 'On match point: ' + rs.matchPoint.map(id => esc(team(id)?.name || '')).join(', ') + '. The first of them to win a Booyah is the champion.' : 'No team has reached the target yet.'}</div>`; })() : ''}
   ${waiting ? `<div class="notice" style="margin-bottom:12px">${waiting} match result${waiting > 1 ? 's are' : ' is'} being checked by the admin. ${waiting > 1 ? 'They count' : 'It counts'} once approved.${session.role === 'admin' ? ' <a href="#/admin/results">Approve now →</a>' : ''}</div>` : ''}
-  ${view === 'players' ? playerBoard(st) : view === 'overall' ? overall() : `<div class="grid">${st.groups.map(g => standingsTable(st, g)).join('')}</div>`}`;
+  ${view === 'players' ? playerBoard(st) : view === 'overall' ? overall() : `<div class="grid">${units(st).map(g => standingsTable(st, g)).join('')}</div>`}`;
 }
 function planLine(p) {
   return `<div class="flowline">${p.map(s => `<span class="${s.final ? 'final' : s.wcJoin ? 'wc' : ''}">${s.final ? '🏆 Grand Final · ' + s.entering + ' teams' + (s.sizes.length > 1 ? ' (' + s.sizes.length + ' groups)' : '') + ' · MT ' + s.matches : `${s.name}: ${s.entering}${s.wcJoin ? ' (incl. ' + s.wcJoin + ' WC)' : ''} → ${s.sizes.length} groups · MT ${s.matches} → ${qualText(s.topN, s.extra)} → ${s.advancing}`}</span>`).join('<span style="border:0;background:none">→</span>')}</div>`;
@@ -1151,8 +1293,88 @@ const ICONS = {
   'admin/whatsapp': 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .3-3.4-.7a11.6 11.6 0 0 1-4.5-4c-.3-.5-1.1-1.5-1.1-2.8s.7-2 1-2.3a1 1 0 0 1 .7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .6l-.4.6-.4.5c-.1.1-.3.3-.1.6a8.6 8.6 0 0 0 1.6 2 7.9 7.9 0 0 0 2.3 1.4c.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3a2.4 2.4 0 0 1-.2 1.6z',
   'admin/complaints': 'M12 2 1 21h22zm1 15h-2v-2h2zm0-4h-2V9h2z',
   'admin/settings': 'M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.3 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.3-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 3.5-3.5 3.5 3.5 0 0 1-3.5 3.5z',
-  'admin/log': 'M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7zm-1 5v5l4 2.5.8-1.3-3.3-2V8z'
+  'admin/log': 'M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7zm-1 5v5l4 2.5.8-1.3-3.3-2V8z',
+  'admin/ads': 'M3 10v4h3l5 4V6l-5 4zm13.5 2A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z'
 };
+// ---------- ads (Admin → Ads): an image or video with a message, shown on the landing page ----------
+// S.settings.ads = [{ id, kind: 'image' | 'video', src, message, link, active, createdAt }]. Images are resized and kept as
+// data URLs (like the logo). Videos: online they go to the Supabase Storage bucket "ads" (supabase/ads.sql); in the
+// offline demo a short video (up to 4 MB) is kept in the browser.
+const AD_MAX = 6, AD_MSG = 160, AD_VIDEO_MB = 25, AD_VIDEO_LOCAL_MB = 4;
+let adDraft = null, adErr = '';
+const adsList = () => Array.isArray(S.settings.ads) ? S.settings.ads : [];
+// Only our own uploads may be shown: resized images, small local videos, or files in this project's "ads" bucket.
+function adSrcOk(a) {
+  if (!a || typeof a.src !== 'string') return false;
+  if (a.kind === 'image') return /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(a.src);
+  if (a.kind === 'video') { const base = ((window.SQUAD_CONFIG || {}).supabaseUrl || '').replace(/\/$/, '');
+    return /^data:video\/(mp4|webm);base64,[A-Za-z0-9+/=]+$/.test(a.src) || (!!base && a.src.startsWith(base + '/storage/v1/object/public/ads/') && !/["'<>\s]/.test(a.src)); }
+  return false;
+}
+const adLinkOk = l => /^https:\/\/[^\s"'<>]+$/.test(l || '');
+function adMedia(a, cls) {
+  return a.kind === 'video' ? `<video class="${cls}" src="${esc(a.src)}" muted autoplay loop playsinline preload="metadata" aria-label="Ad video"></video>` : `<img class="${cls}" src="${esc(a.src)}" alt="${esc(a.message || 'Ad')}">`;
+}
+// Landing page banner: active ads, one at a time (they rotate every 7 seconds when there are several).
+function adsBanner() {
+  const ads = adsList().filter(a => a.active && adSrcOk(a)); if (!ads.length) return '';
+  return `<section class="ads" aria-label="Announcements" data-n="${ads.length}">${ads.map((a, i) => `<div class="ad-slide${i ? '' : ' on'}">${adMedia(a, 'ad-media')}
+    ${a.message || adLinkOk(a.link) ? `<div class="ad-cap">${a.message ? `<p>${esc(a.message)}</p>` : ''}${adLinkOk(a.link) ? `<a class="btn small" href="${esc(a.link)}" target="_blank" rel="noopener noreferrer">Learn more</a>` : ''}</div>` : ''}</div>`).join('')}
+    ${ads.length > 1 ? `<div class="ad-dots">${ads.map((_, i) => `<button type="button" class="${i ? '' : 'on'}" data-act="adDot" data-i="${i}" aria-label="Show ad ${i + 1}"></button>`).join('')}</div>` : ''}</section>`;
+}
+function adShow(box, i) { box.querySelectorAll('.ad-slide').forEach((x, k) => x.classList.toggle('on', k === i)); box.querySelectorAll('.ad-dots button').forEach((x, k) => x.classList.toggle('on', k === i)); }
+setInterval(() => { const box = document.querySelector('.ads'); if (!box || box.matches(':hover')) return; const n = Number(box.dataset.n) || 1; if (n < 2) return;
+  const cur = [...box.querySelectorAll('.ad-slide')].findIndex(x => x.classList.contains('on')); adShow(box, (cur + 1) % n); }, 7000);
+function viewAds() {
+  const ads = adsList(), full = ads.length >= AD_MAX;
+  const row = (a, i) => `<div class="ad-row${a.active ? '' : ' off'}">${adSrcOk(a) ? adMedia(a, 'ad-thumb') : '<span class="ad-thumb bad">File not allowed</span>'}
+    <div class="ad-info"><b>${a.kind === 'video' ? 'Video' : 'Image'}</b> <span class="badge ${a.active ? 'b-ok' : ''}">${a.active ? 'Showing' : 'Hidden'}</span><p>${a.message ? esc(a.message) : '<span class="muted">No message</span>'}</p>${adLinkOk(a.link) ? `<a class="small" href="${esc(a.link)}" target="_blank" rel="noopener noreferrer">${esc(a.link)}</a>` : ''}</div>
+    <div class="ad-acts"><button class="btn ghost small" data-act="adToggle" data-i="${i}">${a.active ? 'Hide' : 'Show'}</button>
+      <button class="btn ghost small" data-act="adMove" data-i="${i}" data-d="-1" ${i ? '' : 'disabled'} aria-label="Move up">↑</button><button class="btn ghost small" data-act="adMove" data-i="${i}" data-d="1" ${i < ads.length - 1 ? '' : 'disabled'} aria-label="Move down">↓</button>
+      <button class="btn ghost small" data-act="adDel" data-i="${i}">Delete</button></div></div>`;
+  return `<h1>Ads</h1><p class="sub">Images or videos with a message, shown at the top of the landing page. Up to ${AD_MAX} ads; when there are several they take turns.</p>
+  <div class="grid g2"><div class="card"><h3>New ad</h3>
+    <form data-form="ad">
+      <label>Image or video *</label><input type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" data-act="adFile" ${full ? 'disabled' : ''}>
+      <p class="small muted" style="margin:4px 0 0">Image: PNG, JPG or WEBP (resized to 1280 pixels wide). Video: MP4 or WEBM, up to ${Cloud.on ? AD_VIDEO_MB + ' MB' : AD_VIDEO_LOCAL_MB + ' MB in this offline demo'}; it plays muted on a loop.</p>
+      ${adDraft ? `<div class="ad-preview">${adMedia({ kind: adDraft.kind, src: adDraft.src }, 'ad-thumb')}<span class="small muted">${esc(adDraft.name)}</span></div>` : ''}
+      <label>Message</label><textarea name="message" rows="3" maxlength="${AD_MSG}" placeholder="e.g. Season 2 registrations open on 1 Jan — ₹1,00,000 prize pool!"></textarea>
+      <label>Button link (optional)</label><input name="link" type="url" placeholder="https://…" pattern="https://.*">
+      <label class="check"><input type="checkbox" name="active" checked> Show on the landing page now</label>
+      ${adErr ? `<div class="errors">${esc(adErr)}</div>` : ''}
+      <div class="row" style="margin-top:10px"><button class="btn" ${full || !adDraft ? 'disabled' : ''}>Add ad</button>${full ? `<span class="small muted">${AD_MAX} ads is the limit. Delete one first.</span>` : ''}</div>
+    </form></div>
+    <div class="card"><h3>Ads · ${ads.length}</h3>${ads.length ? ads.map(row).join('') : '<p class="muted">No ads yet. The landing page shows none until you add one.</p>'}</div></div>`;
+}
+// Read the chosen file: images are resized in the browser; videos are kept as they are (checked for type and size).
+function readAdFile(file) {
+  adErr = '';
+  if (/^image\/(png|jpeg|webp)$/.test(file.type)) {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, 1280 / img.width), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); adDraft = { kind: 'image', src: c.toDataURL('image/jpeg', 0.85), name: file.name }; render(); };
+    img.onerror = () => { URL.revokeObjectURL(url); adErr = 'Could not read that image.'; render(); }; img.src = url; return;
+  }
+  if (/^video\/(mp4|webm)$/.test(file.type)) {
+    const limit = Cloud.on ? AD_VIDEO_MB : AD_VIDEO_LOCAL_MB;
+    if (file.size > limit * 1024 * 1024) { adErr = `The video is ${(file.size / 1048576).toFixed(1)} MB. Use one under ${limit} MB.`; adDraft = null; render(); return; }
+    if (Cloud.on) { adDraft = { kind: 'video', src: URL.createObjectURL(file), name: file.name, file }; render(); return; }
+    const rd = new FileReader(); rd.onload = () => { adDraft = { kind: 'video', src: String(rd.result), name: file.name }; render(); }; rd.onerror = () => { adErr = 'Could not read that video.'; render(); }; rd.readAsDataURL(file); return;
+  }
+  adErr = 'Use a PNG, JPG or WEBP image, or an MP4 or WEBM video.'; adDraft = null; render();
+}
+async function addAd(form) {
+  const fd = new FormData(form), message = String(fd.get('message') || '').trim().slice(0, AD_MSG), link = String(fd.get('link') || '').trim();
+  adErr = '';
+  if (!adDraft) adErr = 'Choose an image or video first.'; else if (link && !adLinkOk(link)) adErr = 'The link must start with https://'; else if (adsList().length >= AD_MAX) adErr = `${AD_MAX} ads is the limit.`;
+  if (adErr) { render(); return; }
+  let src = adDraft.src;
+  if (adDraft.file) { try { toast('Uploading video…'); src = await Cloud.uploadAd(adDraft.file); } catch (err) { adErr = err.message; render(); return; } URL.revokeObjectURL(adDraft.src); }
+  const ad = { id: 'ad' + Date.now().toString(36), kind: adDraft.kind, src, message, link: link || '', active: !!fd.get('active'), createdAt: new Date().toISOString() };
+  if (!adSrcOk(ad)) { adErr = 'That file can’t be shown.'; render(); return; }
+  S.settings.ads = [...adsList(), ad]; adDraft = null;
+  log('Ad added', (ad.kind === 'video' ? 'Video' : 'Image') + (message ? ': ' + message.slice(0, 60) : '')); save(); toast('Ad added'); render();
+}
 function adminCounts() {
   const matches = S.stages.flatMap(s => s.groups.flatMap(g => g.matches));
   return { pending: slotTeams().filter(t => t.status === 'pending').length, results: matches.filter(m => m.resultStatus === 'submitted').length,
@@ -1163,7 +1385,7 @@ function adminShell(route, body) {
   const c = adminCounts();
   const nav = [['Manage', [['admin', 'Dashboard'], ['admin/teams', 'Teams', c.pending], ...(wcOn() || S.teams.some(t => t.entry === 'WC') ? [['admin/wildcards', 'Wild Cards']] : []), ['admin/stages', 'Stages & groups']]],
     ['Match day', [['room', 'Room panel'], ['admin/results', 'Results', c.results], ['admin/ocr', 'Upload screenshots'], ['admin/whatsapp', 'WhatsApp', c.wa], ['admin/complaints', 'Complaints', c.complaints]]],
-    ['System', [['admin/settings', 'Settings'], ['admin/log', 'Activity log']]]];
+    ['System', [['admin/ads', 'Ads'], ['admin/settings', 'Settings'], ['admin/log', 'Activity log']]]];
   const [label, cls] = tourStatus();
   return `<div class="admin">
     <aside class="side">
@@ -1194,7 +1416,7 @@ function viewAdmin() {
   const regBars = [['Approved', c('approved'), 'ok'], ['Pending', c('pending'), 'warn'], ['Waitlist', c('waitlist'), 'acc'], ['Rejected', c('rejected'), 'bad']];
   const regMax = Math.max(1, ...regBars.map(b => b[1]));
   const live = ms.filter(x => x.m.status === 'live' || x.m.status === 'room' || x.m.status === 'checkin');
-  const next = ms.filter(x => x.m.resultStatus !== 'approved' && x.m.status === 'scheduled').slice(0, 5);
+  const next = ms.filter(x => !mDone(x.m) && x.m.status === 'scheduled').slice(0, 5);
   const timeline = [...live, ...next].slice(0, 7);
   const greet = (h => h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening')(new Date().getHours());
   return `<div class="dash-head"><div><div class="eyebrow">${greet}</div><h1>Dashboard</h1><p class="sub">${esc(S.settings.name)} · ${st ? esc(st.name) + ' · ' + st.status : 'Registration ' + (S.settings.regOpen ? 'open' : 'closed')}</p></div>
@@ -1281,6 +1503,45 @@ function pathEditor(slots, wc, path, wcStage, wcCount, mts, names) {
     ${locked < n - 1 ? '<div class="row" style="margin-top:8px"><button type="button" class="btn ghost small" data-act="pathAdd">+ Add a stage before the Grand Final</button></div>' : ''}
     ${wcBlock(wc, wcStage, wcOpts, wcCount)}`;
 }
+// ---------- template editor (Settings) ----------
+// Save a template and the numbers that follow from it (registered slots, Wild Card places, final mode).
+function applyTemplate(key, counts) {
+  const tpl = E.TEMPLATES[key], rows = E.tplPlan(tpl, counts), fin = rows[rows.length - 1], s = S.settings;
+  s.template = key; s.tplCounts = counts || {};
+  s.slots = rows.find(r => r.entry === 'slots').entering;
+  s.wildCards = rows.reduce((a, r) => a + (r.wcJoin || 0), 0);
+  s.finalMode = fin.mode === 'rush' ? 'rush' : 'normal'; if (fin.rushTarget) s.rushTarget = fin.rushTarget;
+}
+// The numbers typed in the template editor (locked rows keep what the stage really has).
+function readTplCounts(form, tpl) {
+  const out = {}, val = n => { const el = form.querySelector(`[name="${n}"]`); return el ? Math.floor(Number(el.value)) : undefined; };
+  tpl.stages.forEach(d => { const st = stageByKey(d.key), o = {};
+    const t = st ? st.entering : val('tt_' + d.key), q = st && st.status === 'done' ? (st.qualified || []).length : val('tq_' + d.key);
+    if (Number.isFinite(t)) o.total = t; if (Number.isFinite(q)) o.qualified = q; out[d.key] = o; });   // matches: the template's own
+  return out;
+}
+const LANE = { underdog: 'Underdog path', wc: 'Wild Card path', main: '' };
+// One row per fixed stage: name, Total, Qualified, MT, and what follows from them (groups, who qualifies, Wild Cards joining).
+function tplEditor(key, counts) {
+  const tpl = E.TEMPLATES[key], rows = E.tplPlan(tpl, counts), errs = E.checkTemplate(tpl, counts, tplLockedKeys(), tplDoneKeys());
+  const nameOf = k => tpl.stages.find(d => d.key === k).name;
+  const shape = r => r.kind === 'cs' ? `${r.units} ClashSquad pair${r.units > 1 ? 's' : ''} · best of ${r.bestOf}` : r.kind === 'paired' ? `3 groups of ${r.unitSize} (${(r.labels || ['1', '2', '3']).join(', ')}) · lobbies play in pairs: ${(r.labels || ['1', '2', '3']).slice(0, 2).join(' vs ')}, … (12 per lobby)` : r.units === 1 ? `1 lobby of ${r.entering}` : `${r.units} groups of 12`;
+  const lanes = [...new Set(rows.map(r => r.path))];
+  const row = r => { const st = stageByKey(r.key), lockT = !!st, lockQ = st && st.status === 'done';
+    const qual = r.final ? 'the champion is decided here' + (r.mode === 'rush' ? ` · Champion Rush ${r.rushTarget} pts` : '') : r.kind === 'cs' ? `${r.advancing} pair winners go through` : `${qualText(r.topN, r.extra)} of ${r.units} group${r.units > 1 ? 's' : ''} → ${r.advancing} go through`;
+    const join = r.entry === 'slots' ? ' · registered teams (Total slots)' : r.entry === 'wc' ? ` · ${r.entering} Wild Card teams` : r.wcJoin > 0 ? ` · ${r.wcJoin} Wild Cards join (${r.entering} − ${r.inQ} from ${r.from.map(nameOf).join(' + ')})` : ` · from ${r.from.map(nameOf).join(' + ')}`;
+    return `<div class="path-row${r.final ? ' final' : ''}"><div class="sn"><input value="${esc(r.name)}" disabled aria-label="Stage name (fixed)"></div>
+      <div><input name="tt_${r.key}" data-act="tplCount" type="number" min="2" value="${r.entering}" ${lockT ? 'disabled title="Locked: this stage is generated"' : ''} aria-label="${esc(r.name)} total teams"></div>
+      <div><input name="tq_${r.key}" data-act="tplCount" type="number" min="1" value="${r.final ? '' : r.advancing}" ${r.final || r.kind === 'cs' || lockQ ? 'disabled' : ''} placeholder="–" aria-label="${esc(r.name)} qualified teams"></div>
+      <div><input class="tpl-wc${r.wcJoin > 0 ? ' on' : ''}" value="${r.entry === 'slots' ? '–' : r.wcJoin}" disabled title="Wild Cards joining = Total − teams qualifying into this stage" aria-label="${esc(r.name)} Wild Cards joining"></div>
+      <span class="small muted">${lockT ? '<b style="color:var(--ink)">Locked: generated.</b> ' : ''}${r.shapeError ? `<span style="color:var(--ff-red)">${esc(r.shapeError)}</span>` : shape(r) + ' · ' + qual + join}</span></div>`; };
+  return `<input type="hidden" name="template" value="${key}">
+    <p class="small muted" style="margin:8px 0 0"><b style="color:var(--ink)">${esc(tpl.label)}</b>: the stages are fixed. Change only each stage's <b style="color:var(--ink)">Total</b> and <b style="color:var(--ink)">Qualified</b> teams. The <b style="color:var(--ink)">Wild Cards</b> column fills itself: a stage's Total minus the teams qualifying into it.</p>
+    <div class="path tpl-ed"><div class="path-row path-head"><em>Stage</em><em>Total</em><em>Qualified</em><em title="Worked out: Total − teams qualifying in">Wild Cards</em></div>
+    ${lanes.map(l => `${LANE[l] ? `<div class="tpl-lane">${LANE[l]}</div>` : lanes.length > 1 ? '<div class="tpl-lane">Main stages</div>' : ''}${rows.filter(r => r.path === l).map(row).join('')}`).join('')}</div>
+    <p class="small muted" style="margin:6px 0 0">Registered slots: <b style="color:var(--ink)">${rows.find(r => r.entry === 'slots').entering}</b> · Wild Card places: <b style="color:var(--ink)">${rows.reduce((a, r) => a + (r.wcJoin || 0), 0)}</b>${rows.slice(-1)[0].mode === 'rush' ? ` · Grand Final: Champion Rush ${rows.slice(-1)[0].rushTarget} pts` : ''}</p>
+    ${errs.length ? `<div class="notice" style="border-color:var(--ff-red);margin-top:8px"><b>Fix before saving:</b> ${esc(errs[0])}</div>` : ''}`;
+}
 // Wild Cards are optional. On: how many (a multiple of 12, counted in team places) and the stage they join. Off: only registered teams play.
 // They can be changed until the Wild Cards have joined a stage.
 function wcBlock(wc, wcStage, wcOpts, wcCount) {
@@ -1338,8 +1599,8 @@ function viewSettings() {
     <h3 style="margin-top:20px">Format</h3>
     <label>Bracket format</label>${formatSelect(s, 'preset')}
     <p class="small muted" style="margin:4px 0 0">Every group has exactly <b style="color:var(--ink)">12 teams</b>. Choose how many stages you want and how many teams play each one, the Grand Final included (multiples of 12). Stage 1 is the number of slots teams register for. The groups and who qualifies follow from the counts.</p>
-    <div id="pathEd">${pathEditor(s.slots, Number(s.wildCards) || 0, bracket().path, bracket().wcStage, s.wcLast, stageMatches(), stageNames())}</div>
-    <div class="pf"><div><label>Grand Final mode</label><select name="finalMode"><option value="normal" ${s.finalMode !== 'rush' ? 'selected' : ''}>Normal: most points wins</option><option value="rush" ${s.finalMode === 'rush' ? 'selected' : ''}>Champion Rush</option></select></div>
+    <div id="pathEd">${tplOn() ? tplEditor(s.template, s.tplCounts) : pathEditor(s.slots, Number(s.wildCards) || 0, bracket().path, bracket().wcStage, s.wcLast, stageMatches(), stageNames())}</div>
+    <div class="pf" id="finalModeBox" ${tplOn() ? 'hidden' : ''}><div><label>Grand Final mode</label><select name="finalMode"><option value="normal" ${s.finalMode !== 'rush' ? 'selected' : ''}>Normal: most points wins</option><option value="rush" ${s.finalMode === 'rush' ? 'selected' : ''}>Champion Rush</option></select></div>
       <div><label>Champion Rush points target</label><input name="rushTarget" type="number" min="1" max="999" value="${Number(s.rushTarget) || 80}"></div></div>
     <p class="small muted">These apply to stages generated from now on. A stage still in draft can be changed on the Stages page.</p>
     ${probs.length ? `<div class="notice" style="border-color:var(--ff-red)"><b>The stage team counts need fixing.</b> ${esc(probs[0])}.</div>` : ''}
@@ -1350,7 +1611,8 @@ function viewSettings() {
     <div class="row" style="margin-top:12px"><button class="btn">Save settings</button></div>
   </form></div>
   <div class="card"><h3>Demo data</h3><div class="row"><button class="btn ghost" data-act="sample">Load sample teams (registration open)</button><button class="btn ghost" data-act="demoTour">Load demo tournament (Stage 3 live)</button><button class="btn red" data-act="reset">Reset everything</button></div>
-    <p class="small muted">Each button replaces ALL teams, stages and results${Cloud.on ? ' in the database' : ' in this browser'}. <b>Sample teams</b>: 252 teams + 12 Wild Cards with registration open. <b>Demo tournament</b>: the same teams with Stages 1–2 played and Stage 3 live (groups, matches, standings). <b>Reset everything</b>: empty, with registration open so the Register page works.</p></div></div>`;
+    <div class="row" style="margin-top:8px">${Object.values(E.TEMPLATES).map(t => `<button class="btn ghost small" data-act="demoTpl" data-k="${t.key}">Demo: ${esc(t.label)}</button>`).join('')}</div>
+    <p class="small muted">Each button replaces ALL teams, stages and results${Cloud.on ? ' in the database' : ' in this browser'}. <b>Sample teams</b>: 252 teams + 12 Wild Cards with registration open. <b>Demo tournament</b>: the same teams with Stages 1–2 played and Stage 3 live (groups, matches, standings). <b>Reset everything</b>: empty, with registration open so the Register page works. <b>Demo: template</b>: that roadmap template with sample teams, played up to a live stage.</p></div></div>`;
 }
 let teamFilter = { q: '', status: 'all' }, emailLogRows = null;
 let showPw = false, pwResult = null;
@@ -1432,7 +1694,7 @@ function viewWildcards() {
   const open = S.wcInvites.filter(i => i.status === 'open');
   const left = Math.max(0, S.settings.wildCards - active - open.length);
   const join = plan().find(s => s.wcJoin);
-  const closed = wcJoined();
+  const closed = wcClosed();
   const link = i => location.origin + location.pathname + '#/wildcard/' + i.token;
   const inviteText = i => `You're invited as a Wild Card team in ${S.settings.name}! Register your squad here (private link, do not share): ${link(i)}`;
   return `${adminTabs('admin/wildcards')}<h1>Wild Cards</h1><p class="sub">${active} of ${S.settings.wildCards} places used${open.length ? ' · ' + open.length + ' invite' + (open.length > 1 ? 's' : '') + ' waiting' : ''} · they join ${join ? '<b>' + join.name + '</b>' : 'a later stage'}. Wild Card teams are <b>not shown on the public site</b> until you place them and publish that stage.</p>
@@ -1472,7 +1734,7 @@ function viewWcInvite(token) {
   } else {
     const i = S.wcInvites.find(x => x.token === token);
     info = i ? { ok: i.status === 'open', status: i.status } : { ok: false };
-    if (i && wcJoined()) info = { ok: false, status: 'closed' };
+    if (i && wcClosed()) info = { ok: false, status: 'closed' };
   }
   if (!info.ok) return `<div class="card glass" style="max-width:520px;margin:auto;text-align:center"><h1>Invite not available</h1>
     <p class="muted">${info.status === 'used' ? 'This invite has already been used to register a team.' : info.status === 'revoked' ? 'This invite was cancelled by the organiser.' : info.status === 'closed' ? 'Wild Card entries are closed.' : 'This invite link is not valid. Ask the organiser for a new one.'}</p></div>`;
@@ -1521,42 +1783,61 @@ function teamResultsEditor(t) {
       <td><a class="btn small ghost" href="#/admin/match/${encodeURIComponent(m.id)}?t=${encodeURIComponent(t.id)}" title="Edit this match's points table">✎</a></td></tr>`; }).join('')}
     </tbody></table></div></div>`;
 }
+// One stage's card on the Stages page: its settings, buttons and groups (every button carries the stage, data-s).
+function stageCard(st, p) {
+    const draft = st.status === 'draft';
+    const U = units(st), cap = unitSize(st);
+    const groupOpts = (cur) => U.map((g, gi) => `<option value="${gi}" ${gi === cur ? 'selected' : ''} ${g.teamIds.length >= cap && gi !== cur ? 'disabled' : ''}>${gName(st, g, 1)} (${g.teamIds.length}/${cap})</option>`).join('');
+    const mt = st.matchCount || (st.final ? E.FINAL_MATCHES : E.MATCHES);
+    const cfg = `<form data-form="stagecfg" class="stagecfg"><input type="hidden" name="s" value="${st.index}"><div><label>Start date</label><input type="date" name="startDate" value="${esc(stageStart(st))}"></div>
+      <div><label>Matches per group (MT)</label><input type="number" name="matchCount" min="1" max="30" value="${mt}" ${draft && st.kind !== 'cs' && !st.tpl ? '' : 'disabled'} ${st.tpl ? 'title="Set by the template"' : ''}></div>
+      ${st.final ? `<div><label>Final mode</label><input value="${st.kind === 'cs' ? 'ClashSquad · best of ' + (st.bestOf || 1) : rushOn() ? 'Champion Rush · ' + rushTarget() + ' pts' : 'Normal'}" disabled></div>` : st.tpl ? `<div><label>Qualified teams</label><input value="${st.toNext ?? ''}" disabled title="Change it in Settings → Format"><span class="small muted">${st.kind === 'cs' ? 'the winner of each pair' : qualText(st.topN, st.extra) + ' of each group'} · change in Settings</span></div>` : `<div><label>Teams in ${esc(p[st.index + 1]?.name || 'the next stage')} (multiple of 12)</label><input type="number" name="toNext" min="12" step="12" value="${bracket().path[st.index] ?? ''}" ${st.status === 'done' ? 'disabled' : ''}>
+        <span class="small muted">Top ${st.topN} of each group${st.extra ? ` + ${st.extra} best ${ordinal(st.topN + 1)} place${st.extra > 1 ? 's' : ''}` : ''}${p[st.index + 1]?.wcJoin ? ` · incl. ${p[st.index + 1].wcJoin} Wild Cards` : ''}</span></div>`}
+      <button class="btn ghost small">Save stage</button>${draft ? '' : '<span class="small muted">Matches lock once the stage is published. The next stage team count can change until you approve the qualifiers.</span>'}</form>`;
+    return `<div class="card"><div class="row between"><h3>${st.name} · ${st.entering} teams · ${U.length} ${st.kind === 'cs' ? 'pair' : 'group'}${U.length > 1 ? 's' : ''} · MT ${mt} · <span class="badge b-acc">${st.status}</span></h3>
+      <div class="row">${draft ? `<button class="btn green" data-act="publish" data-s="${st.index}" ${st.wcTray.length ? 'disabled' : ''}>Lock & publish</button>` : ''}
+      ${st.status === 'published' && !allApproved(st) ? `<button class="btn ghost" data-act="simulate" data-s="${st.index}">Simulate all results</button>` : ''}
+      ${st.status === 'published' && allApproved(st) ? `<button class="btn green" data-act="qualify" data-s="${st.index}">${st.final ? 'Finish tournament' : `Approve ${st.toNext ?? ''} qualifiers (${qualText(st.topN, st.extra)}) & close stage`}</button>` : ''}
+      ${st.status === 'done' && !st.final && !st.tpl ? `<button class="btn" data-act="genNext" data-s="${st.index}">Generate ${p[st.index + 1] ? p[st.index + 1].name : 'next stage'}</button>` : ''}</div></div>
+      ${cfg}
+      ${draft ? `<p class="small muted">Draft: every group must have exactly ${cap} teams before publishing. Publishing shows the groups and schedule to teams.${st.pools ? ' The lobbies (two groups together) are made when you publish.' : ''}</p>` : ''}
+      ${st.wcTray.length ? `<div class="notice"><b>Place ${st.wcTray.length} Wild Card team${st.wcTray.length > 1 ? 's' : ''}</b> before publishing.
+        <div class="tw" style="margin-top:8px"><table><tbody>${st.wcTray.map(id => `<tr><td>${tname(id)}</td><td><select data-act="placeWc" data-s="${st.index}" data-id="${id}"><option value="">Choose group…</option>${groupOpts(-1)}</select></td></tr>`).join('')}</tbody></table></div>
+        <div class="row" style="margin-top:8px"><button class="btn small" data-act="autoWc" data-s="${st.index}">Auto place (spread evenly)</button></div></div>` : ''}
+    </div>
+    <div class="grid g3" style="margin-top:12px">${U.map((g, gi) => draft ? `<div class="groupcard"><h3>${gName(st, g, 1)} <span class="muted small">${g.teamIds.length}/${cap}</span></h3><ol>${g.teamIds.map(id => `<li class="row between" style="display:list-item"><span>${tname(id)}</span> <select class="small" style="width:auto;padding:2px 4px;font-size:11px" data-act="move" data-s="${st.index}" data-id="${id}" data-from="${gi}">${groupOpts(gi)}</select></li>`).join('')}</ol></div>` : standingsTable(st, g)).join('')}</div>`;
+}
+// Templates: a row of the fixed stages; generate each one when the stages feeding it are finished.
+function tplStagesBody(p) {
+  const pr = params(), rows = tplRows(), sel = S.stages[Number(pr.s ?? S.stages.length - 1)];
+  const badge = st => !st ? '<span class="badge">not generated</span>' : `<span class="badge ${st.status === 'done' ? 'b-ok' : st.status === 'published' ? 'b-acc' : 'b-warn'}">${st.status}</span>`;
+  const next = rows.find(r => !stageByKey(r.key));
+  const tabs = `<div class="tpl-tabs">${rows.map(r => { const st = stageByKey(r.key); return st ? `<a href="#/admin/stages?s=${st.index}" class="${st === sel ? 'on' : ''}">${esc(r.name)} ${badge(st)}</a>` : `<span class="off">${esc(r.name)} ${badge(st)}</span>`; }).join('')}</div>`;
+  let gen = '';
+  if (next) { const why = tplBlocked(next);
+    gen = `<div class="card"><h3>Generate ${esc(next.name)}</h3><p>${next.entry === 'slots' ? `${approvedSlotCount()} of ${next.entering} registered teams approved` : next.entry === 'wc' ? `${unplacedWc().length} approved Wild Card teams for ${next.entering} places` : `${next.inQ} qualified teams${next.wcJoin ? ` + ${next.wcJoin} Wild Cards (${unplacedWc().length} available)` : ''}`} → ${next.kind === 'cs' ? next.units + ' ClashSquad pairs' : next.kind === 'paired' ? '3 groups of ' + next.unitSize + ' (lobbies in pairs)' : next.units + (next.units > 1 ? ' groups' : ' lobby')}.</p>
+      <div class="row"><button class="btn" data-act="genTpl" data-k="${next.key}" data-mode="${next.entry === 'slots' ? 'sequential' : 'seeded'}" ${why ? 'disabled' : ''}>Generate ${esc(next.name)}</button>${next.entry === 'slots' ? `<button class="btn ghost" data-act="genTpl" data-k="${next.key}" data-mode="random" ${why ? 'disabled' : ''}>Generate random</button>` : ''}</div>
+      <p class="small muted">${why ? esc(why) : next.entry === 'slots' ? 'This closes registration.' : 'Teams are seeded from the stages before.'}</p></div>`; }
+  return `${tabs}${sel ? stageCard(sel, p) : ''}${gen}`;
+}
 function viewStages() {
   const st = curStage();
   const p = plan();
   let body = '';
-  if (!st) {
+  if (tplOn()) body = tplStagesBody(p);
+  else if (!st) {
     const why = stage1Blocked(), n = approvedSlotCount(), slots = S.settings.slots;
     body = `<div class="card"><h3>Generate Stage 1</h3><p>${n} of ${slots} slots filled with approved teams → ${Math.floor(slots / E.GROUP_SIZE)} groups of 12.${S.teams.some(t => t.entry === 'SLOT' && t.status === 'pending') ? ' <span class="badge b-warn">Some teams are still pending</span>' : ''}</p>
       <div class="row"><button class="btn" data-act="gen1" data-mode="sequential" ${why ? 'disabled' : ''}>Generate in slot order</button><button class="btn ghost" data-act="gen1" data-mode="random" ${why ? 'disabled' : ''}>Generate random</button></div>
       <p class="small muted">${why ? esc(why) : 'This closes registration.'}</p></div>`;
   } else {
-    const draft = st.status === 'draft';
-    const groupOpts = (cur) => st.groups.map((g, gi) => `<option value="${gi}" ${gi === cur ? 'selected' : ''} ${g.teamIds.length >= 12 && gi !== cur ? 'disabled' : ''}>${gName(st, g, 1)} (${g.teamIds.length}/12)</option>`).join('');
-    const mt = st.matchCount || (st.final ? E.FINAL_MATCHES : E.MATCHES);
-    const cfg = `<form data-form="stagecfg" class="stagecfg"><div><label>Start date</label><input type="date" name="startDate" value="${esc(stageStart(st))}"></div>
-      <div><label>Matches per group (MT)</label><input type="number" name="matchCount" min="1" max="30" value="${mt}" ${draft ? '' : 'disabled'}></div>
-      ${st.final ? `<div><label>Final mode</label><input value="${rushOn() ? 'Champion Rush · ' + rushTarget() + ' pts' : 'Normal'}" disabled></div>` : `<div><label>Teams in ${esc(p[st.index + 1]?.name || 'the next stage')} (multiple of 12)</label><input type="number" name="toNext" min="12" step="12" value="${bracket().path[st.index] ?? ''}" ${st.status === 'done' ? 'disabled' : ''}>
-        <span class="small muted">Top ${st.topN} of each group${st.extra ? ` + ${st.extra} best ${ordinal(st.topN + 1)} place${st.extra > 1 ? 's' : ''}` : ''}${p[st.index + 1]?.wcJoin ? ` · incl. ${p[st.index + 1].wcJoin} Wild Cards` : ''}</span></div>`}
-      <button class="btn ghost small">Save stage</button>${draft ? '' : '<span class="small muted">Matches lock once the stage is published. The next stage team count can change until you approve the qualifiers.</span>'}</form>`;
-    body = `<div class="card"><div class="row between"><h3>${st.name} · ${st.entering} teams · ${st.groups.length} group${st.groups.length > 1 ? 's' : ''} · MT ${mt} · <span class="badge b-acc">${st.status}</span></h3>
-      <div class="row">${draft ? `<button class="btn green" data-act="publish" ${st.wcTray.length ? 'disabled' : ''}>Lock & publish</button>` : ''}
-      ${st.status === 'published' && !allApproved(st) ? `<button class="btn ghost" data-act="simulate">Simulate all results</button>` : ''}
-      ${st.status === 'published' && allApproved(st) ? `<button class="btn green" data-act="qualify">${st.final ? 'Finish tournament' : `Approve ${st.toNext ?? ''} qualifiers (${qualText(st.topN, st.extra)}) & close stage`}</button>` : ''}
-      ${st.status === 'done' && !st.final ? `<button class="btn" data-act="genNext">Generate ${p[st.index + 1] ? p[st.index + 1].name : 'next stage'}</button>` : ''}</div></div>
-      ${cfg}
-      ${draft ? '<p class="small muted">Draft: every group must have exactly 12 teams before publishing. Publishing shows the groups and schedule to teams.</p>' : ''}
-      ${st.wcTray.length ? `<div class="notice"><b>Place ${st.wcTray.length} Wild Card team${st.wcTray.length > 1 ? 's' : ''}</b> before publishing.
-        <div class="tw" style="margin-top:8px"><table><tbody>${st.wcTray.map(id => `<tr><td>${tname(id)}</td><td><select data-act="placeWc" data-id="${id}"><option value="">Choose group…</option>${groupOpts(-1)}</select></td></tr>`).join('')}</tbody></table></div>
-        <div class="row" style="margin-top:8px"><button class="btn small" data-act="autoWc">Auto place (spread evenly)</button></div></div>` : ''}
-    </div>
-    <div class="grid g3" style="margin-top:12px">${st.groups.map((g, gi) => draft ? `<div class="groupcard"><h3>${gName(st, g, 1)} <span class="muted small">${g.teamIds.length}/12</span></h3><ol>${g.teamIds.map(id => `<li class="row between" style="display:list-item"><span>${tname(id)}</span> <select class="small" style="width:auto;padding:2px 4px;font-size:11px" data-act="move" data-id="${id}" data-from="${gi}">${groupOpts(gi)}</select></li>`).join('')}</ol></div>` : standingsTable(st, g)).join('')}</div>`;
+    body = stageCard(st, p);
   }
-  const fmtLocked = S.stages.length && !S.stages.some(x => x.status === 'draft') && S.stages[S.stages.length - 1].final;
+  const fmtLocked = tplOn() ? S.stages.length > 0 : S.stages.length && !S.stages.some(x => x.status === 'draft') && S.stages[S.stages.length - 1].final;
   const fmtForm = fmtLocked ? '' : `<form class="card fmt-pick" data-form="format"><div><label>Bracket format</label>${formatSelect(S.settings, 'preset')}</div>
     <button class="btn">Generate format</button><p class="small muted">Redraws the roadmap below. ${S.stages.length ? 'Applies to stages not generated yet.' : 'Fine-tune the numbers in Settings.'}</p></form>`;
   return `${adminTabs('admin/stages')}<h1>Stages & groups</h1>${fmtForm}${viewRoadmap(true)}<br>${body}
-  ${S.stages.length > 1 ? `<h2>Earlier stages</h2><p>${S.stages.slice(0, -1).map((s, i) => `<a href="#/leaderboard?stage=${i}">${s.name}</a> (${s.entering} → ${(s.qualified || []).length})`).join(' · ')}</p>` : ''}`;
+  ${S.stages.length > 1 && !tplOn() ? `<h2>Earlier stages</h2><p>${S.stages.slice(0, -1).map((s, i) => `<a href="#/leaderboard?stage=${i}">${s.name}</a> (${s.entering} → ${(s.qualified || []).length})`).join(' · ')}</p>` : ''}`;
 }
 // Admin: the full points table of one match, editable (opened from a complaint's Fix result or a team's ✎).
 let mpErr = '';
@@ -1566,6 +1847,12 @@ function viewMatchPoints(id) {
   const { st, g, m } = fm, c = pr.c !== undefined ? S.complaints[Number(pr.c)] : null, focus = pr.t;
   const back = c ? '#/admin/complaints' : focus ? '#/admin/team/' + focus : '#/admin/results';
   if (!m.results) return `${adminTabs('admin/complaints')}<a class="small" href="${back}">← Back</a><h1>Match points</h1><p class="muted">This match has no results yet.</p>`;
+  if (st.kind === 'cs') return `${adminTabs('admin/complaints')}<a class="small" href="${back}">← Back</a>
+  <h1>${esc(st.name)} · ${esc(gName(st, g))} · Game ${m.no}</h1><p class="sub">ClashSquad: the winner is the first team to ${E.CS_ROUNDS} rounds. Correcting a game can change who wins the pair.</p>
+  ${mpErr ? `<div class="errors">${esc(mpErr)}</div>` : ''}
+  <form data-form="matchpoints" data-m="${m.id}"><div class="tw"><table><thead><tr><th>Team</th><th>Rounds won</th><th>Kills</th></tr></thead><tbody>
+  ${g.teamIds.map(id => `<tr><td>${tname(id)}</td><td><input name="rounds_${id}" type="number" min="0" max="${E.CS_ROUNDS}" value="${m.results[id]?.rounds ?? 0}" style="width:80px"></td><td><input name="kills_${id}" type="number" min="0" max="99" value="${m.results[id]?.kills ?? 0}" style="width:80px"></td></tr>`).join('')}</tbody></table></div>
+  <div class="row" style="margin-top:10px"><button class="btn">Save correction</button></div></form>`;
   const order = g.teamIds.slice().sort((a, b) => { const ra = m.results[a], rb = m.results[b]; return (ra && !ra.noShow ? ra.place : 99) - (rb && !rb.noShow ? rb.place : 99); });
   return `${adminTabs('admin/complaints')}<a class="small" href="${back}">← Back</a>
   <h1>${esc(st.name)} · ${esc(gName(st, g))} · Match ${m.no}</h1>
@@ -1588,8 +1875,8 @@ function viewResults() {
   ${items.length ? `<div class="row" style="margin-bottom:10px"><button class="btn green small" data-act="approveAllResults">Approve all ${items.length}</button></div>` : '<p class="muted">Nothing waiting.</p>'}
   <div class="grid g2">${items.map(({ st, g, m }) => `<div class="card"><h3>${st.name} · ${gName(st, g, 1)} · Match ${m.no} · ${esc(m.map)}</h3>
     <p class="small muted">Screenshots: ${m.screenshots.length ? m.screenshots.map(esc).join(', ') : 'none'}</p>
-    <div class="tw"><table><thead><tr><th>Team</th><th>Pos</th><th>Kills</th><th>Pts</th></tr></thead><tbody>
-    ${Object.entries(m.results).sort((a, b) => (a[1].noShow ? 99 : a[1].place) - (b[1].noShow ? 99 : b[1].place)).map(([id, r]) => `<tr><td>${tname(id)}</td><td>${r.noShow ? 'No-show' : r.place}</td><td>${r.noShow ? 0 : r.kills}</td><td>${r.noShow ? 0 : E.matchPoints(r.place, r.kills)}</td></tr>`).join('')}</tbody></table></div>
+    ${st.kind === 'cs' ? csResultTable(m) : `<div class="tw"><table><thead><tr><th>Team</th><th>Pos</th><th>Kills</th><th>Pts</th></tr></thead><tbody>
+    ${Object.entries(m.results).sort((a, b) => (a[1].noShow ? 99 : a[1].place) - (b[1].noShow ? 99 : b[1].place)).map(([id, r]) => `<tr><td>${tname(id)}</td><td>${r.noShow ? 'No-show' : r.place}</td><td>${r.noShow ? 0 : r.kills}</td><td>${r.noShow ? 0 : E.matchPoints(r.place, r.kills)}</td></tr>`).join('')}</tbody></table></div>`}
     <div class="row" style="margin-top:8px"><button class="btn green small" data-act="approveResult" data-m="${m.id}">Approve</button><button class="btn ghost small" data-act="returnResult" data-m="${m.id}">Send back to room creator</button></div></div>`).join('')}</div>`;
 }
 function approvedText(t) { return `${S.settings.name}: ${t.name} is APPROVED ✅ Team ID ${t.code || ''} · Slot ${t.slotNo || 'Wild Card'}. Watch My Team for your group and matches.`; }
@@ -1642,19 +1929,20 @@ function viewLog() {
 // ---------- room creator ----------
 let roomErr = '';
 function viewRoom() {
-  const st = curStage();
+  const live = liveStages();
   const tabs = session.role === 'admin' ? adminTabs('room') : '';
-  if (!st || st.status !== 'published') return `${tabs}<h1>Room panel</h1><p class="muted">No published stage with matches right now.</p>`;
+  if (!live.length) return `${tabs}<h1>Room panel</h1><p class="muted">No published stage with matches right now.</p>`;
   const pr = params();
-  const all = st.groups.flatMap((g, gi) => g.matches.map(m => ({ g, gi, m })));
-  const queue = all.filter(x => x.m.resultStatus !== 'approved');
+  // Every published stage (two paths can run at the same time in a roadmap template).
+  const all = live.flatMap(s2 => s2.groups.flatMap((g, gi) => g.matches.map(m => ({ st: s2, g, gi, m }))));
+  const queue = all.filter(x => !mDone(x.m));
   const sel = all.find(x => x.m.id === pr.m) || queue[0];
-  if (!sel) return `${tabs}<h1>Room panel</h1><p class="muted">All ${st.name} matches have approved results.</p>`;
-  const { g, m } = sel;
+  if (!sel) return `${tabs}<h1>Room panel</h1><p class="muted">All ${live.map(x => x.name).join(', ')} matches have approved results.</p>`;
+  const { st, g, m } = sel, cs = st.kind === 'cs';
   const editing = m.status === 'completed' && m.resultStatus === 'none';
-  return `${tabs}<h1>Room panel</h1><p class="sub">${st.name} · ${queue.length} matches left</p>
+  return `${tabs}<h1>Room panel</h1><p class="sub">${live.map(x => x.name).join(' · ')} · ${queue.length} matches left</p>
   <div class="grid g3"><div class="card" style="max-height:540px;overflow:auto"><h3>Match queue</h3>
-    ${queue.slice(0, 80).map(x => `<a href="#/room?m=${x.m.id}" class="row between" style="text-decoration:none;padding:6px 8px;border-radius:8px;${x.m.id === m.id ? 'background:var(--panel2)' : ''}"><span>${st.final ? gName(st, x.g, 1) : 'G' + GL(x.g.label)} · M${x.m.no} <span class="muted small">${matchDate(st, x.m)} ${x.m.time}</span></span>${matchBadge(x.m)}</a>`).join('')}
+    ${queue.slice(0, 80).map(x => `<a href="#/room?m=${x.m.id}" class="row between" style="text-decoration:none;padding:6px 8px;border-radius:8px;${x.m.id === m.id ? 'background:var(--panel2)' : ''}"><span>${live.length > 1 ? `<span class="muted small">${esc(x.st.name)}</span> ` : ''}${x.g.name ? esc(x.g.name) : x.st.final ? gName(x.st, x.g, 1) : 'G' + GL(x.g.label)} · ${x.st.kind === 'cs' ? 'Game' : 'M'}${x.m.no} <span class="muted small">${matchDate(x.st, x.m)} ${x.m.time}</span></span>${matchBadge(x.m)}</a>`).join('')}
   </div>
   <div class="card" style="grid-column:span 2"><div class="row between"><h3>${gName(st, g)} · Match ${m.no} · ${esc(m.map)} · ${matchDate(st, m)}, ${m.time}</h3>${matchBadge(m)}</div>
     ${roomErr ? `<div class="errors">${esc(roomErr)}</div>` : ''}
@@ -1665,14 +1953,18 @@ function viewRoom() {
       ${m.status === 'live' ? `<button class="btn" data-act="mstatus" data-m="${m.id}" data-s="completed">Mark completed</button>` : ''}
       ${m.status !== 'completed' && m.status !== 'scheduled' ? `<button class="btn ghost small" data-act="checkinAll" data-m="${m.id}">Demo: check in all teams</button>` : ''}
     </div>
-    ${editing ? `<form data-form="results" data-m="${m.id}"><div class="tw"><table><thead><tr><th>Slot</th><th>Team</th><th>Checked in</th><th>Position</th><th>Kills</th><th>No-show</th></tr></thead><tbody>
+    ${editing && cs ? `<form data-form="results" data-m="${m.id}"><p class="small muted">ClashSquad game: the winner is the first team to ${E.CS_ROUNDS} rounds.</p><div class="tw"><table><thead><tr><th>Team</th><th>Checked in</th><th>Rounds won</th><th>Kills</th></tr></thead><tbody>
+      ${g.teamIds.map(id => `<tr><td>${tname(id)}</td><td>${m.checkins.includes(id) ? '✅' : '—'}</td><td><input name="rounds_${id}" type="number" min="0" max="${E.CS_ROUNDS}" value="0" style="width:80px"></td><td><input name="kills_${id}" type="number" min="0" max="99" value="0" style="width:80px"></td></tr>`).join('')}</tbody></table></div>
+      <label>Screenshots (required)</label><input type="file" name="shots" accept="image/*" multiple>
+      <div class="row" style="margin-top:10px"><button class="btn">${session.role === 'admin' ? 'Publish result' : 'Submit result to admin'}</button><button type="button" class="btn ghost" data-act="randomFill" data-m="${m.id}">Demo: random fill</button></div></form>`
+      : editing ? `<form data-form="results" data-m="${m.id}"><div class="tw"><table><thead><tr><th>Slot</th><th>Team</th><th>Checked in</th><th>Position</th><th>Kills</th><th>No-show</th></tr></thead><tbody>
       ${g.teamIds.map((id, i) => `<tr><td>${i + 1}</td><td>${tname(id)}</td><td>${m.checkins.includes(id) ? '✅' : '—'}</td>
       <td><select name="place_${id}" style="width:80px"><option value="">–</option>${g.teamIds.map((_, k) => `<option>${k + 1}</option>`).join('')}</select></td>
       <td><input name="kills_${id}" type="number" min="0" max="99" value="0" style="width:80px"></td><td><input type="checkbox" name="ns_${id}" ${m.checkins.includes(id) ? '' : 'checked'}></td></tr>`).join('')}</tbody></table></div>
       <label>Screenshots (required)</label><input type="file" name="shots" accept="image/*" multiple>
       <div class="row" style="margin-top:10px"><button class="btn">${session.role === 'admin' ? 'Publish results' : 'Submit results to admin'}</button><button type="button" class="btn ghost" data-act="randomFill" data-m="${m.id}">Demo: random fill</button></div></form>`
       : `<div class="tw"><table><thead><tr><th>Slot</th><th>Team</th><th>Checked in</th>${m.results ? '<th>Pos</th><th>Kills</th>' : ''}</tr></thead><tbody>
-      ${g.teamIds.map((id, i) => `<tr><td>${i + 1}</td><td>${tname(id)}</td><td>${m.checkins.includes(id) ? '✅' : '—'}</td>${m.results ? `<td>${m.results[id]?.noShow ? 'No-show' : m.results[id]?.place}</td><td>${m.results[id]?.kills ?? ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`}
+      ${g.teamIds.map((id, i) => `<tr><td>${i + 1}</td><td>${tname(id)}</td><td>${m.checkins.includes(id) ? '✅' : '—'}</td>${m.results ? `<td>${cs ? (m.results[id]?.rounds ?? '') + ' rounds' : m.results[id]?.noShow ? 'No-show' : m.results[id]?.place}</td><td>${m.results[id]?.kills ?? ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`}
   </div></div>`;
 }
 // The last earlier match of this group that had a room (for "use the same room").
@@ -1703,7 +1995,7 @@ function render() {
   if (r.startsWith('admin') && session.role !== 'admin') { app.innerHTML = `<p>Admins only.</p>${viewStaff()}`; return; }
   const views = { register: viewRegister, 'my-team': () => session.teamCode ? viewTeamDash() : viewMyTeamLogin(), groups: viewGroups, schedule: viewSchedule, leaderboard: viewLeaderboard,
     bracket: viewBracket, info: viewInfo, staff: viewStaff, admin: viewAdmin, 'admin/settings': viewSettings, 'admin/teams': viewTeams, 'admin/wildcards': viewWildcards,
-    'admin/stages': viewStages, 'admin/results': viewResults, 'admin/ocr': viewOcr, 'admin/complaints': viewComplaints, 'admin/log': viewLog, 'admin/whatsapp': viewWhatsapp, room: viewRoom };
+    'admin/stages': viewStages, 'admin/results': viewResults, 'admin/ocr': viewOcr, 'admin/complaints': viewComplaints, 'admin/log': viewLog, 'admin/whatsapp': viewWhatsapp, 'admin/ads': viewAds, room: viewRoom };
   views.overview = viewOverview;
   views.bracket = viewBracketTeams;
   const pub = ['', 'overview', 'register', 'groups', 'schedule', 'leaderboard', 'bracket', 'info'];
@@ -1714,7 +2006,7 @@ function render() {
   else if (r.startsWith('admin/team/')) app.innerHTML = adminShell('admin/teams', viewEditTeam(r.split('/')[2]));
   else if (r.startsWith('admin/match/')) app.innerHTML = adminShell('admin/complaints', viewMatchPoints(decodeURIComponent(r.split('/')[2])));
   else {
-    const html = (pub.includes(key) ? hero(key) : '') + `<div class="page-body">${(views[key] || viewOverview)()}</div>`;
+    const html = (pub.includes(key) ? hero(key) : '') + (key === 'overview' ? adsBanner() : '') + `<div class="page-body">${(views[key] || viewOverview)()}</div>`;
     const shell = session.role === 'admin' && (key.startsWith('admin') || key === 'room');
     app.innerHTML = shell ? adminShell(key, html) : html;
   }
@@ -1763,6 +2055,12 @@ document.addEventListener('submit', e => {
   if (kind === 'matchpoints') {
     const fm = findMatch(f.dataset.m); if (!fm || !fm.m.results) { toast('Match result not found'); return; }
     const { st, g, m } = fm, res = {}, used = new Set(); mpErr = '';
+    if (st.kind === 'cs') {
+      g.teamIds.forEach(id => { res[id] = { rounds: Math.floor(Number(fd.get('rounds_' + id))), kills: Math.max(0, Math.floor(Number(fd.get('kills_' + id)) || 0)) }; });
+      const chk = E.csGame(res, g.teamIds); if (chk.errors.length) { mpErr = chk.errors[0]; render(); return; }
+      const before = E.csGame(m.results, g.teamIds).winner; m.results = res; csSettle(st, g);
+      log('Result corrected', `${st.name} ${gName(st, g)} Game ${m.no}: winner ${team(before)?.name || '-'} → ${team(chk.winner).name}`); openFix = null; save(); toast('Game corrected'); render(); return;
+    }
     for (const id of g.teamIds) {
       const ns = !!fd.get('ns_' + id), place = Number(fd.get('place_' + id)), kills = Math.max(0, Number(fd.get('kills_' + id)) || 0);
       if (ns) { res[id] = { noShow: true, place: null, kills: 0 }; continue; }
@@ -1796,9 +2094,9 @@ document.addEventListener('submit', e => {
     log('Result corrected', what); openFix = null; save(); toast('Result updated'); render(); return;
   }
   if (kind === 'stagecfg') {
-    const st = curStage(); if (!st) return;
+    const st = fd.get('s') !== null && S.stages[Number(fd.get('s'))] ? S.stages[Number(fd.get('s'))] : curStage(); if (!st) return;
     // A new team count for the next stage: the stages after it are re-worked, and nothing is saved if it doesn't give full groups of 12.
-    if (st.status !== 'done' && !st.final && fd.get('toNext') !== null) {
+    if (!tplOn() && st.status !== 'done' && !st.final && fd.get('toNext') !== null) {
       const v = Math.floor(Number(fd.get('toNext'))), b = bracket();
       if (v !== b.path[st.index]) {
         const path = b.path.slice(); path[st.index] = v;
@@ -1811,17 +2109,28 @@ document.addEventListener('submit', e => {
     }
     const d = String(fd.get('startDate') || ''); if (/^\d{4}-\d{2}-\d{2}$/.test(d)) st.startDate = d;
     if (st.status === 'draft') { const mc = Math.floor(Number(fd.get('matchCount')));
-      if (mc >= 1 && mc <= 30) { st.matchCount = mc; const m = stageMatches(); m[st.index] = mc; S.settings.stageMatches = m; } }   // keep Settings in step
+      if (mc >= 1 && mc <= 30 && st.kind !== 'cs' && !st.tpl) { st.matchCount = mc; if (tplOn() && st.tpl) { S.settings.tplCounts = { ...(S.settings.tplCounts || {}), [st.tpl]: { ...((S.settings.tplCounts || {})[st.tpl] || {}), matches: mc } }; } else { const m = stageMatches(); m[st.index] = mc; S.settings.stageMatches = m; } } }   // keep Settings in step
     log('Stage settings changed', `${st.name}: starts ${st.startDate || '-'}, MT ${st.matchCount || '-'}${st.final ? '' : ', ' + (st.toNext ?? '-') + ' go through'}`); save(); toast('Stage saved'); render(); return;
   }
   if (kind === 'format') {
+    const pk = String(fd.get('preset') || '');
+    if (pk.startsWith('tpl:') || tplOn()) {
+      if (S.stages.length) { toast('The format can only change before the first stage is generated'); render(); return; }
+      if (pk.startsWith('tpl:')) { applyTemplate(pk.slice(4), {}); log('Bracket format changed', pathText()); save(); toast('Template chosen: set the team numbers in Settings'); render(); return; }
+      var tplBackup = JSON.stringify(S.settings);
+      delete S.settings.template; delete S.settings.tplCounts;
+      // Template Wild Card places can be any number; the other formats need a multiple of 12.
+      const wcN = Number(S.settings.wildCards) || 0; if (wcN % E.GROUP_SIZE) S.settings.wildCards = Math.ceil(wcN / E.GROUP_SIZE) * E.GROUP_SIZE;
+      if (!E.slotsOk(S.settings.slots)) S.settings.slots = Math.max(24, Math.round(S.settings.slots / E.GROUP_SIZE) * E.GROUP_SIZE);
+      delete S.settings.path; delete S.settings.wcStage;
+    }
     const f = FORMATS[fd.get('preset')];
     if (f) {
       // Fill the stage team counts from this format; stages that already exist keep theirs.
       const s = S.settings, wc = Number(s.wildCards) || 0, keep = bracket().path.slice(0, lockedPathCount());
       const t = keep.length ? E.suggestPath(s.slots, wc, f.stage1Top, f.laterTop, { path: keep, wcStage: bracket().wcStage }) : E.suggestPath(s.slots, wc, f.stage1Top, f.laterTop);
       const probs = formatProblems({ path: t.path, wcStage: t.wcStage });
-      if (probs.length) { toast(`Not changed: ${probs[0]}. Set the team counts in Settings.`); return; }
+      if (probs.length) { if (typeof tplBackup !== 'undefined' && tplBackup) S.settings = JSON.parse(tplBackup); toast(`Not changed: ${probs[0]}. Set the team counts in Settings.`); render(); return; }
       const old = stageMatches(), n = t.path.length + 1, fixed = i => S.stages[i] && S.stages[i].status !== 'draft';
       FORMAT_KEYS.forEach(k => { s[k] = f[k]; }); s.path = t.path; s.wcStage = t.wcStage;
       s.stageMatches = Array.from({ length: n }, (_, i) => fixed(i) ? S.stages[i].matchCount || old[i] : i === n - 1 ? f.finalMatches : f.matchesPerStage);
@@ -1831,7 +2140,30 @@ document.addEventListener('submit', e => {
     else toast('Custom format: set the team counts in Settings');
     render(); return;
   }
+  if (kind === 'settings' && String(fd.get('preset') || '').startsWith('tpl:')) {
+    const key = String(fd.get('preset')).slice(4), tpl = E.TEMPLATES[key];
+    const showErr = html => { const box = document.getElementById('setErr'); if (box) { box.innerHTML = `<div class="notice" style="border-color:var(--ff-red);margin-top:12px">${html}</div>`; box.scrollIntoView({ block: 'center' }); } toast('Not saved: see the message in red'); };
+    if (!tpl) return;
+    if (S.stages.length && S.settings.template !== key) { showErr('<b>The format can only change before the first stage is generated.</b>'); return; }
+    const counts = readTplCounts(f, tpl), errs = E.checkTemplate(tpl, counts, tplLockedKeys(), tplDoneKeys());
+    if (errs.length) { showErr(`<b>The team numbers need fixing.</b> ${esc(errs[0])}.`); return; }
+    const rows = E.tplPlan(tpl, counts), wcPlaces = rows.reduce((a, r) => a + (r.wcJoin || 0), 0);
+    const wcHave = S.teams.filter(t => t.entry === 'WC' && (t.status === 'approved' || t.status === 'pending')).length;
+    if (wcHave > wcPlaces) { showErr(`<b>${wcHave} Wild Card teams are already registered</b> but this plan has places for ${wcPlaces}. Raise the totals or remove teams on the Wild Cards page.`); return; }
+    applyTemplate(key, counts);
+    const s = S.settings;
+    s.name = String(fd.get('name') || 'Squad Cup').trim(); s.regCloses = String(fd.get('regCloses')); s.prize = String(fd.get('prize') || '').trim(); s.organiser = String(fd.get('organiser') || '').trim(); s.startDate = String(fd.get('startDate') || '');
+    if (Cloud.on) { s.emailFrom = String(fd.get('emailFrom') || '').trim(); s.emailName = String(fd.get('emailName') || '').trim(); s.siteUrl = location.origin; }
+    s.regOpen = !!fd.get('regOpen'); s.notifyPaused = !!fd.get('notifyPaused');
+    const lines = k => String(fd.get(k) || '').split('\n').map(x => x.trim().slice(0, 200)).filter(Boolean).slice(0, 20);
+    s.rulesMatch = lines('rulesMatch'); s.rulesFair = lines('rulesFair');
+    S.stages.forEach(st => { if (st.status === 'draft' && st.tpl && st.kind !== 'cs') st.matchCount = E.templateCounts(tpl, counts)[st.tpl].matches; });
+    if (!S.stages.length) { const active = slotTeams().filter(t => t.status === 'pending' || t.status === 'approved').sort((a, b) => a.slotNo - b.slotNo);
+      active.slice(s.slots).forEach(t => { t.status = 'waitlist'; t.slotNo = null; }); promoteWaitlist(); }
+    syncTargets(); log('Settings saved', pathText()); save(); toast('Saved'); render(); return;
+  }
   if (kind === 'settings') {
+    if (S.stages.length === 0) { delete S.settings.template; delete S.settings.tplCounts; }
     // Check the bracket first: slots a multiple of 12, and every stage's team count a multiple of 12 ending with a Grand Final of 12.
     // Nothing is saved if it doesn't work. (Locked counts are disabled inputs, so read them from the form, not FormData.)
     const slots = S.stages.length ? S.settings.slots : Number(fd.get('slots'));
@@ -1880,6 +2212,7 @@ document.addEventListener('submit', e => {
     syncTargets();
     log('Settings saved', `slots ${s.slots}, wild cards ${wc ? wc : 'off'}, stages ${pathText()}`); save(); toast('Saved'); render(); return;
   }
+  if (kind === 'ad') { addAd(f); return; }
   if (kind === 'wildcard') {
     const data = readTeamForm(f); wcDraft = data;
     wcErrors = E.validateTeam(data, allPlayers(), S.teams.filter(t => t.status !== 'rejected').map(t => t.name));
@@ -1968,7 +2301,11 @@ document.addEventListener('submit', e => {
     log('Room released', m.id); save(); toast('Room details sent to checked-in teams'); render(); return;
   }
   if (kind === 'results') {
-    const { g, m } = findMatch(f.dataset.m); const res = {}; const used = new Set(); roomErr = '';
+    const { st: fs, g, m } = findMatch(f.dataset.m); const res = {}; const used = new Set(); roomErr = '';
+    if (fs.kind === 'cs') {
+      g.teamIds.forEach(id => { res[id] = { rounds: Math.floor(Number(fd.get('rounds_' + id))), kills: Math.max(0, Math.floor(Number(fd.get('kills_' + id)) || 0)) }; });
+      const chk = E.csGame(res, g.teamIds); if (chk.errors.length) roomErr = chk.errors[0];
+    } else
     for (const id of g.teamIds) {
       const ns = !!fd.get('ns_' + id), place = Number(fd.get('place_' + id)), kills = Number(fd.get('kills_' + id)) || 0;
       if (ns) { res[id] = { noShow: true, place: null, kills: 0 }; continue; }
@@ -1981,14 +2318,23 @@ document.addEventListener('submit', e => {
     if (roomErr) { render(); return; }
     const admin = session.role === 'admin';   // the admin is the approver, so their own entry is published at once
     m.results = res; m.screenshots = shots.length ? shots : ['demo-screenshot.png']; m.resultStatus = admin ? 'approved' : 'submitted';
+    if (admin) csSettle(fs, g);
     log(admin ? 'Results entered and published' : 'Results submitted', m.id); save(); toast(admin ? 'Results published: points are on the leaderboard' : 'Sent to admin for approval. Points appear once approved.'); render(); return;
   }
 });
 document.addEventListener('change', e => {
   const el = e.target, act = el.dataset.act; if (!act) return;
-  const st = curStage();
+  const st = el.dataset.s != null && el.dataset.s !== '' && S.stages[+el.dataset.s] ? S.stages[+el.dataset.s] : curStage();
   if (act === 'filter') { teamFilter.status = el.value; render(); }
   if (act === 'dashMatch') { location.hash = '#/admin?mr=' + encodeURIComponent(el.value); return; }
+  if (act === 'tplCount') { const form = el.closest('form'), key = form.elements.template.value; form.querySelector('#pathEd').innerHTML = tplEditor(key, readTplCounts(form, E.TEMPLATES[key])); return; }
+  if (act === 'preset' && el.closest('form')?.dataset.form === 'settings' && (el.value.startsWith('tpl:') || el.closest('form').elements.template)) {
+    const form = el.closest('form');
+    if (S.stages.length) { toast('The format can only change before the first stage is generated'); el.value = formatOf(S.settings); return; }
+    { const box = form.querySelector('#finalModeBox'); if (box) box.hidden = el.value.startsWith('tpl:'); }
+    if (el.value.startsWith('tpl:')) { form.querySelector('#pathEd').innerHTML = tplEditor(el.value.slice(4), el.value.slice(4) === S.settings.template ? S.settings.tplCounts : {}); return; }
+    form.querySelector('#pathEd').innerHTML = pathEditor(S.settings.slots, 0, E.suggestPath(S.settings.slots, 0, 8, 6).path, 0, S.settings.wcLast, null, null);
+  }
   if (act === 'preset') { const f = FORMATS[el.value], form = el.closest('form');
     if (f && form && form.dataset.form === 'settings') {
       if (form.elements.finalMode) form.elements.finalMode.value = f.finalMode;
@@ -2012,6 +2358,7 @@ document.addEventListener('change', e => {
   if (act === 'path' || act === 'pathBase' || act === 'pathWc' || act === 'pathWcOn') { const form = el.closest('form');
     if (form) { refreshPathEd(form, (slots, wc, path, ws) => act === 'pathWc' ? { path, wcStage: ws } : tidyPath(slots, wc, path, ws, act === 'path' ? Number(el.dataset.k) : lockedPathCount() - 1));
       if (form.elements.preset) form.elements.preset.value = 'custom'; } }
+  if (act === 'adFile') { const file = el.files[0]; if (file) readAdFile(file); return; }
   if (act === 'tlogo') { const file = el.files[0]; if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) { toast('Use a PNG, JPG or WEBP image'); return; }
     const img = new Image(), url = URL.createObjectURL(file);
@@ -2030,15 +2377,17 @@ document.addEventListener('change', e => {
   }
   if (act === 'move') {
     const from = Number(el.dataset.from), to = Number(el.value), id = el.dataset.id;
-    if (st.groups[to].teamIds.length >= 12) { toast('That group is full (12)'); render(); return; }
-    st.groups[from].teamIds = st.groups[from].teamIds.filter(x => x !== id); st.groups[to].teamIds.push(id);
-    log('Team moved', team(id).name + ' → Group ' + GL(st.groups[to].label)); save(); render();
+    const U = units(st);
+    if (U[to].teamIds.length >= unitSize(st)) { toast(`That group is full (${unitSize(st)})`); render(); return; }
+    U[from].teamIds = U[from].teamIds.filter(x => x !== id); U[to].teamIds.push(id);
+    log('Team moved', team(id).name + ' → ' + gName(st, U[to])); save(); render();
   }
   if (act === 'placeWc' && el.value !== '') {
     const to = Number(el.value), id = el.dataset.id;
-    if (st.groups[to].teamIds.length >= 12) { toast('That group is full (12)'); render(); return; }
-    st.groups[to].teamIds.push(id); st.wcTray = st.wcTray.filter(x => x !== id);
-    log('Wild Card placed', team(id).name + ' → Group ' + GL(st.groups[to].label) + ' slot ' + st.groups[to].teamIds.length); save(); render();
+    const U = units(st);
+    if (U[to].teamIds.length >= unitSize(st)) { toast(`That group is full (${unitSize(st)})`); render(); return; }
+    U[to].teamIds.push(id); st.wcTray = st.wcTray.filter(x => x !== id);
+    log('Wild Card placed', team(id).name + ' → ' + gName(st, U[to]) + ' slot ' + U[to].teamIds.length); save(); render();
   }
   if (act === 'import') {
     const file = el.files[0]; if (!file) return;
@@ -2067,7 +2416,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.tagName === 'SELECT' || el.tagName === 'INPUT') return;
-  const act = el.dataset.act, st = curStage();
+  const act = el.dataset.act, st = el.dataset.s != null && el.dataset.s !== '' && S.stages[+el.dataset.s] ? S.stages[+el.dataset.s] : curStage();
   const done = (msg) => { save(); if (msg) toast(msg); render(); };
   switch (act) {
     case 'copy': e.preventDefault(); navigator.clipboard?.writeText(el.dataset.text).then(() => toast('Copied'), () => toast(el.dataset.text)); break;
@@ -2092,6 +2441,12 @@ document.addEventListener('click', e => {
     case 'emailLogClose': emailLogRows = null; render(); break;
     case 'togglePw': showPw = !showPw; render(); break;
     case 'sameNameToggle': sameNameOpen = !sameNameOpen; render(); break;
+    case 'adDot': { const box = el.closest('.ads'); if (box) adShow(box, Number(el.dataset.i)); break; }
+    case 'adToggle': { const a = adsList()[+el.dataset.i]; if (!a) break; a.active = !a.active; log(a.active ? 'Ad shown' : 'Ad hidden', a.message.slice(0, 60)); done(a.active ? 'Ad is showing' : 'Ad hidden'); break; }
+    case 'adMove': { const L = adsList().slice(), i = +el.dataset.i, j = i + Number(el.dataset.d); if (j < 0 || j >= L.length) break; [L[i], L[j]] = [L[j], L[i]]; S.settings.ads = L; done(); break; }
+    case 'adDel': { const a = adsList()[+el.dataset.i]; if (!a || !confirm('Delete this ad?')) break; S.settings.ads = adsList().filter(x => x !== a);
+      if (Cloud.on && a.kind === 'video' && !a.src.startsWith('data:')) Cloud.removeAd(a.src).catch(() => {});
+      log('Ad deleted', (a.message || '').slice(0, 60)); done('Ad deleted'); break; }
     case 'tlogoRemove': e.preventDefault(); delete S.settings.logo; log('Tournament logo removed', ''); done('Logo removed'); break;
     case 'sameRoom': { const fm = findMatch(el.dataset.m), pm = prevRoom(fm.g, fm.m), f = el.closest('form'); if (pm) { f.roomId.value = pm.roomId; f.roomPass.value = pm.roomPass; toast('Filled from Match ' + pm.no + '. Click Release room to send it.'); } break; }
     case 'deleteTeam': { const t = team(el.dataset.id); if (!t) break;
@@ -2108,11 +2463,18 @@ document.addEventListener('click', e => {
     case 'teamlogout': if (Cloud.on) { Cloud.teamLogout().then(render); break; } session.teamCode = null; done(); break;
     case 'checkin': if (Cloud.on && !Cloud.role) { el.disabled = true; Cloud.checkin(el.dataset.m).then(() => { toast('Checked in ✅'); render(); }, err => { toast(err.message); render(); }); break; }
     { const { m } = findMatch(el.dataset.m); if (!m.checkins.includes(el.dataset.t)) m.checkins.push(el.dataset.t); log('Checked in', team(el.dataset.t).name + ' ' + m.id); done('Checked in ✅'); break; }
+    case 'demoTpl': {
+      const t = E.TEMPLATES[el.dataset.k]; if (!t) break;
+      if (!confirm(`Replace ALL tournament data with a ${t.label} demo (stages played up to a live stage)? The bracket format becomes this template.`)) break;
+      (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => { loadDemoTemplate(t.key); save(); toast(t.label + ' demo loaded'); location.hash = '#/admin/stages'; render(); }, err => toast(err.message));
+      break;
+    }
     case 'sample': case 'demoTour': {
       const tour = act === 'demoTour';
       if (!confirm(tour ? 'Replace ALL tournament data with a demo tournament (264 teams, Stages 1–2 played, Stage 3 live)?' : 'Replace ALL tournament data with 252 sample teams + 12 Wild Cards? Registration stays open.')) break;
       (Cloud.on ? Cloud.reset() : Promise.resolve()).then(() => {
         const keep = S.settings; loadSample(); if (Cloud.on) S.settings = keep;
+        delete S.settings.template; delete S.settings.tplCounts;
         if (Number(S.settings.wildCards) % E.GROUP_SIZE) S.settings.wildCards = wcTeams().length;   // Wild Cards must be a multiple of 12
         S.settings.regOpen = true;
         if (tour) { const why = stage1Blocked(); if (why) { save(); toast('Sample teams loaded, but ' + why); render(); return; } loadDemoTournament(); }
@@ -2156,28 +2518,18 @@ document.addEventListener('click', e => {
       log('Stage 1 generated', ids.length + ' teams, ' + stage.groups.length + ' groups (' + el.dataset.mode + ')'); done(stage.groups.length + ' groups created'); break;
     }
     case 'autoWc': {
-      st.wcTray.slice().forEach(id => { const g = st.groups.reduce((a, b) => b.teamIds.length < a.teamIds.length ? b : a); if (g.teamIds.length < 12) { g.teamIds.push(id); st.wcTray = st.wcTray.filter(x => x !== id); log('Wild Card placed', team(id).name + ' → Group ' + GL(g.label)); } });
-      done('Wild Cards placed'); break;
+      autoPlaceWc(st); done('Wild Cards placed'); break;
     }
-    case 'publish': {
-      const off = st.groups.find(g => g.teamIds.length !== E.GROUP_SIZE);
-      if (off) { toast(`Every group needs exactly 12 teams: ${gName(st, off)} has ${off.teamIds.length}`); return; }
-      makeMatches(st); st.status = 'published';
-      st.groups.forEach(g => g.teamIds.forEach((id, i) => notify(id, 'group', st.index, `${S.settings.name} · ${st.name}: you are in ${st.final ? gName(st, g) : 'Group ' + GL(g.label)}, Slot ${i + 1}. First match ${matchDate(st, g.matches[0])}, ${g.matches[0].time} (${g.matches[0].map}). Check in on My Team before each match.`)));
-      log(st.name + ' published', st.groups.length + ' groups'); done(st.name + ' published'); break;
-    }
-    case 'simulate': {
-      st.groups.forEach(g => g.matches.forEach(m => { if (m.resultStatus !== 'approved') { m.checkins = g.teamIds.slice(); m.results = randomResults(g.teamIds); m.status = 'completed'; m.screenshots = ['simulated.png']; m.resultStatus = 'approved'; } }));
-      log('Results simulated', st.name); done('All results simulated and approved'); break;
-    }
-    case 'qualify': {
-      st.qualified = st.final ? [] : qualifiersOf(st); st.status = 'done';
-      // In the Grand Final every finalist gets their overall place (all final groups ranked together).
-      if (st.final) finalRows(st).forEach(r => notify(r.teamId, 'result', st.index, `${S.settings.name} Grand Final: you finished #${r.rank} with ${r.points} points.${r.rank === 1 ? ' 🏆 Champions!' : ''}`));
-      else st.groups.forEach(g => rowsOf(g).forEach(r => notify(r.teamId, 'result', st.index,
-        st.qualified.includes(r.teamId) ? `${S.settings.name} · ${st.name}: QUALIFIED ✅ (rank #${r.rank} in Group ${GL(g.label)}, ${r.points} pts). Next stage groups coming soon.`
-          : `${S.settings.name} · ${st.name}: eliminated (rank #${r.rank} in Group ${GL(g.label)}, ${r.points} pts). Thanks for playing!`)));
-      log(st.final ? 'Tournament finished' : st.name + ' qualifiers approved', st.final ? '' : st.qualified.length + ' teams'); done(st.final ? '🏆 Tournament finished' : st.qualified.length + ' teams qualified'); break;
+    case 'publish': { const err = publishStage(st); if (err) { toast(err); return; } done(st.name + ' published'); break; }
+    case 'simulate': { simulateStage(st); log('Results simulated', st.name); done('All results simulated and approved'); break; }
+    case 'qualify': { qualifyStage(st); done(st.final ? '🏆 Tournament finished' : st.qualified.length + ' teams qualified'); break; }
+    case 'genTpl': {
+      const ps = tplRows().find(r => r.key === el.dataset.k); if (!ps) return;
+      const why = tplBlocked(ps); if (why) { toast(why); return; }
+      const stage = buildTplStage(ps, el.dataset.mode || 'seeded'); S.stages.push(stage);
+      if (ps.entry === 'slots') S.settings.regOpen = false;
+      log(stage.name + ' generated', stage.entering + ' teams' + (stage.wcTray.length ? ' incl. ' + stage.wcTray.length + ' Wild Cards' : ''));
+      location.hash = '#/admin/stages?s=' + stage.index; done(stage.name + ' created'); break;
     }
     case 'genNext': {
       const stage = buildStage(st.index + 1, st.qualified, 'seeded');
@@ -2189,16 +2541,18 @@ document.addEventListener('click', e => {
       S.stages.push(stage);
       log(stage.name + ' generated', stage.entering + ' teams' + (stage.wcJoin ? ' incl. ' + stage.wcJoin + ' Wild Cards' : '')); done(stage.name + ' created'); break;
     }
-    case 'approveResult': { const { m } = findMatch(el.dataset.m); m.resultStatus = 'approved'; log('Result approved', m.id); done('Approved'); break; }
+    case 'approveResult': { const { st: fs, g, m } = findMatch(el.dataset.m); m.resultStatus = 'approved'; csSettle(fs, g); log('Result approved', m.id); done('Approved'); break; }
     case 'returnResult': { const { m } = findMatch(el.dataset.m); m.resultStatus = 'none'; m.results = null; log('Result sent back', m.id); done('Sent back'); break; }
-    case 'approveAllResults': { S.stages.forEach(s => s.groups.forEach(g => g.matches.forEach(m => { if (m.resultStatus === 'submitted') m.resultStatus = 'approved'; }))); log('Bulk result approve', ''); done('All approved'); break; }
+    case 'approveAllResults': { S.stages.forEach(s => s.groups.forEach(g => { g.matches.forEach(m => { if (m.resultStatus === 'submitted') m.resultStatus = 'approved'; }); csSettle(s, g); })); log('Bulk result approve', ''); done('All approved'); break; }
     case 'openFix': openFix = openFix === el.dataset.k ? null : el.dataset.k; render(); break;
     case 'viewShot': { const box = document.createElement('div'); box.className = 'lightbox'; box.innerHTML = '<img alt="Screenshot">'; box.firstChild.src = el.src; box.addEventListener('click', () => box.remove()); document.body.appendChild(box); break; }
     case 'resolve': { const c = S.complaints[el.dataset.i]; const ans = prompt('Reply to the team:', el.dataset.v === 'kept' ? 'Result checked, no change.' : 'Result corrected.'); if (ans === null) return; c.status = el.dataset.v; c.answer = ans; log('Complaint ' + c.status, c.matchLabel); done(); break; }
     case 'mstatus': { const { m } = findMatch(el.dataset.m); m.status = el.dataset.s; log('Match ' + el.dataset.s, m.id); done(); break; }
     case 'checkinAll': { const { g, m } = findMatch(el.dataset.m); m.checkins = g.teamIds.slice(); done('All teams checked in'); break; }
     case 'randomFill': {
-      const { g } = findMatch(el.dataset.m); const f = el.closest('form'); const r = randomResults(g.teamIds);
+      const { st: fs, g } = findMatch(el.dataset.m); const f = el.closest('form');
+      if (fs.kind === 'cs') { const r = randomCs(g.teamIds); g.teamIds.forEach(id => { f['rounds_' + id].value = r[id].rounds; f['kills_' + id].value = r[id].kills; }); f.dataset.demo = '1'; break; }
+      const r = randomResults(g.teamIds);
       g.teamIds.forEach(id => { f['place_' + id].value = String(r[id].place); f['kills_' + id].value = r[id].kills; f['ns_' + id].checked = false; });
       f.dataset.demo = '1'; break;
     }

@@ -162,3 +162,46 @@ assert.strictEqual(E.matchName('32 -SUBASH', bz.players).how, 'tag');           
 assert.strictEqual(E.matchName('6MK.SENSEI', tvk.players).how, 'tag');               // tag TVK read as "6MK"
 
 console.log('All engine tests passed');
+
+// Roadmap templates
+{
+const T = E.TEMPLATES, wcOf = k => E.tplPlan(T[k]).map(r => r.wcIn);
+assert.deepStrictEqual(wcOf('rbz'), [0, 38, 6, 0, 0]);
+assert.deepStrictEqual(wcOf('winter'), [0, 0, 48, 0, 3, 2]);
+assert.deepStrictEqual(wcOf('tvk'), [0, 0, 12, 0, 0, 0]);
+assert.deepStrictEqual(E.tplPlan(T.rbz).map(r => r.topN), [2, 3, 9, 4, null]);
+assert.deepStrictEqual(E.tplPlan(T.rbz).map(r => r.units), [17, 6, 2, 3, 1]);
+['rbz', 'winter', 'tvk'].forEach(k => assert.deepStrictEqual(E.checkTemplate(T[k]), [], k));
+assert.ok(E.checkTemplate(T.rbz, { s4: { total: 20 } }).some(e => e.includes('3 groups')));
+assert.ok(E.checkTemplate(T.rbz, { s2: { qualified: 72 } }).some(e => e.includes('fewer than')));
+assert.ok(E.checkTemplate(T.winter, { ud2: { qualified: 11 }, wc2: { qualified: 10 } }).some(e => e.includes('qualify into it')));
+assert.ok(E.checkTemplate(T.tvk, { cs: { total: 11 } }).some(e => e.includes('even number')));
+assert.ok(E.checkTemplate(T.rbz, { s1: { qualified: 10 } }).some(e => e.includes('each of its 17 groups')));
+assert.deepStrictEqual(E.checkTemplate(T.rbz, { s4: { total: 20 } }, new Set(['s4'])).filter(e => e.startsWith('Group Stage')), []);
+assert.deepStrictEqual(E.tplPlan(T.rbz, { s1: { total: 240, qualified: 40 } }).slice(0, 2).map(r => [r.entering, r.units, r.topN, r.extra, r.wcIn]), [[240, 20, 2, 0, 0], [72, 6, 3, 0, 32]]);
+assert.deepStrictEqual(E.pairLobbies(3), [[0, 1], [1, 2], [0, 2]]);
+assert.deepStrictEqual(E.tierAllocate([1, 2, 3, 4, 5, 6], 3), [[1, 2], [3, 4], [5, 6]]);
+assert.deepStrictEqual(E.pairsAllocate([[1], [2], [3], [4]], [[0, 1], [2, 3]]), [[1, 2], [3, 4]]);
+// pool standings from paired lobbies count only that pool's teams
+const lobbyAB = { a1: { place: 1, kills: 2 }, b1: { place: 2, kills: 0 } }, lobbyAC = { a1: { place: 3, kills: 1 }, c1: { place: 1, kills: 5 } };
+const poolA = E.standings(['a1'], [lobbyAB, lobbyAC]);
+assert.deepStrictEqual([poolA.length, poolA[0].played, poolA[0].points], [1, 2, 12 + 2 + 8 + 1]);
+assert.deepStrictEqual(E.qualifyFromUnits([[{ teamId: 'x', points: 9 }, { teamId: 'y', points: 5 }], [{ teamId: 'z', points: 7 }, { teamId: 'w', points: 6 }]], 3), ['x', 'z', 'w']);
+// ClashSquad
+assert.ok(E.csGame({ a: { rounds: 4 }, b: { rounds: 4 } }, ['a', 'b']).errors.length);
+assert.ok(E.csGame({ a: { rounds: 3 }, b: { rounds: 2 } }, ['a', 'b']).errors.length);
+assert.strictEqual(E.csGame({ a: { rounds: 2 }, b: { rounds: 4 } }, ['a', 'b']).winner, 'b');
+const g = (ra, rb) => ({ a: { rounds: ra }, b: { rounds: rb } });
+assert.strictEqual(E.csTie(['a', 'b'], [g(4, 1), g(2, 4), g(4, 3)], 5).decided, false);
+assert.strictEqual(E.csTie(['a', 'b'], [g(4, 1), g(2, 4), g(4, 3), g(4, 0)], 5).winner, 'a');
+assert.deepStrictEqual(E.csRows(['a', 'b'], [g(1, 4)], 1).map(r => r.teamId), ['b', 'a']);
+// a running (generated, not finished) stage still checks its Qualified number
+assert.ok(E.checkTemplate(T.rbz, { s1: { qualified: 0 } }, new Set(['s1'])).some(e => e.includes('Open Qualifiers')));
+assert.deepStrictEqual(E.checkTemplate(T.rbz, { s1: { qualified: 0 } }, new Set(['s1']), new Set(['s1'])).filter(e => e.startsWith('Open')), []);
+// two teams with near-identical names in one lobby: exact names decide (RaviOp vs RaviOp2)
+{ const tA = { id: 'A', players: ['RaviOp', 'ArunOp', 'KarthiOp', 'VijayOp'].map((n, i) => ({ uid: 'a' + i, name: n })) }, tB = { id: 'B', players: ['RaviOp2', 'ArunOp2', 'KarthiOp2', 'VijayOp2'].map((n, i) => ({ uid: 'b' + i, name: n })) };
+  for (let k = 0; k < 2; k++) { const blocks = k ? [tB, tA] : [tA, tB]; const res = E.assignTeams(blocks.map(t => t.players.map(p => [p.name])), [tB, tA]);
+    assert.deepStrictEqual(res.map(r => r.teamId), blocks.map(t => t.id)); } }
+console.log('Template tests passed');
+}
+

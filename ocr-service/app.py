@@ -19,6 +19,7 @@ from parser import parse
 log = logging.getLogger("ocr")
 logging.basicConfig(level=logging.INFO)
 MAX_BYTES = 10 * 1024 * 1024
+MAX_W, MAX_H = 1600, 900   # the size every screenshot is scaled to fit (see read_shot)
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 ORIGINS = [o.strip() for o in os.environ.get("OCR_ALLOW_ORIGINS", "http://localhost:8095,http://localhost:8096,http://127.0.0.1:8095,http://127.0.0.1:8096").split(",") if o.strip()]
@@ -100,8 +101,12 @@ def read_shot(img) -> dict:
     h, w = img.shape[:2]
     if w < h:   # portrait photo of a landscape screen: rotate
         img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE); h, w = img.shape[:2]
-    if w < 1200:   # small screenshots: enlarge so the small names are readable
-        f = 1600 / w; img = cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_CUBIC); h, w = img.shape[:2]
+    # Fit the screenshot to 1600 × 900: small ones (under 1200 wide) are enlarged so the small names are readable; big ones are
+    # shrunk because the OCR model crashes the whole service on large images (a full-size 2400 × 1080 phone screenshot
+    # did; 1600 × 900 is safe). A 2400 × 1080 screenshot becomes 1600 × 720, the size the parser is tuned on.
+    f = min(MAX_W / w, MAX_H / h) if w < 1200 or w > MAX_W or h > MAX_H else 1
+    if abs(f - 1) > 0.02:
+        img = cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_AREA if f < 1 else cv2.INTER_CUBIC); h, w = img.shape[:2]
     res = engines()["ocr"].predict(img)[0]
     boxes = [{"t": t, "s": float(s), "b": [int(v) for v in b]} for t, s, b in zip(res["rec_texts"], res["rec_scores"], res["rec_boxes"])]
     out = parse(boxes, w, h)

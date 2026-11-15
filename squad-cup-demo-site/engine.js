@@ -401,10 +401,14 @@
   // teamMatch: how well a rank's names (reads: one array of readings per player on screen) fit one team's registered
   // players, using every player at once and each registered player at most once. pairs[i] = what reading i links to.
   const LINKS = { exact: 1, lookalike: 1, tag: 1 };
+  // A linked name counts 2 points, a little less the looser the link: the same text beats a look-alike, which beats a
+  // name with a decoration dropped. So when two teams in one lobby have near-identical names (RaviOp and RaviOp2),
+  // the team whose players match exactly always wins.
+  const LINK_PTS = { exact: 2, lookalike: 1.95, tag: 1.9 };
   function teamMatch(reads, players) {
     const cand = reads.map((rs, i) => ({ i, m: matchReadings(rs, players) })).filter(x => x.m.player);
     // strongest first: linked names before suggestions, then by similarity
-    cand.sort((a, b) => (LINKS[b.m.how] ? 2 : b.m.r) - (LINKS[a.m.how] ? 2 : a.m.r));
+    cand.sort((a, b) => (LINKS[b.m.how] ? LINK_PTS[b.m.how] : b.m.r) - (LINKS[a.m.how] ? LINK_PTS[a.m.how] : a.m.r));
     const used = new Set(), pairs = reads.map(() => null);
     let score = 0, linked = 0;
     for (const { i, m } of cand) {
@@ -412,7 +416,7 @@
       used.add(m.player.uid);
       const isLink = !!LINKS[m.how];
       pairs[i] = { uid: m.player.uid, how: m.how, linked: isLink, r: m.r };
-      score += isLink ? 2 : m.r; if (isLink) linked++;
+      score += isLink ? LINK_PTS[m.how] : m.r; if (isLink) linked++;
     }
     return { score: Math.round(score * 100) / 100, linked, pairs };
   }
@@ -471,7 +475,127 @@
     return rows;
   }
 
+  // ---- Roadmap templates (fixed stages; the admin edits only each stage's Total and Qualified teams, and MT) ----
+  // kind: 'br' (Battle Royale lobbies of up to 12), 'paired' (3 groups of up to 6; each lobby is two groups together:
+  // 1+2, 2+3, 1+3), 'cs' (ClashSquad head-to-head pairs). entry: 'slots' = registered teams, 'wc' = Wild Card teams only.
+  // from: stages whose qualifiers enter this one. Wild Cards joining = Total − qualifiers coming in (never typed).
+  const TEMPLATES = {
+    rbz: { key: 'rbz', label: 'RBZ Streamers Battle', stages: [
+      { key: 's1', name: 'Open Qualifiers', path: 'main', kind: 'br', entry: 'slots', total: 204, qualified: 34, matches: 6 },
+      { key: 's2', name: 'Creator Invitational', path: 'main', kind: 'br', from: ['s1'], total: 72, qualified: 18, matches: 6 },
+      { key: 's3', name: 'Streamers Showdown', path: 'main', kind: 'br', from: ['s2'], total: 24, qualified: 18, matches: 6 },
+      { key: 's4', name: 'Group Stage', path: 'main', kind: 'paired', from: ['s3'], total: 18, qualified: 12, matches: 6, labels: ['A', 'B', 'C'] },
+      { key: 's5', name: 'Grand Finals', path: 'main', kind: 'br', from: ['s4'], total: 12, final: true, matches: 12, mode: 'rush', rushTarget: 130 }] },
+    winter: { key: 'winter', label: 'The Final Winter War', stages: [
+      { key: 'ud1', name: 'Underdog Phases', path: 'underdog', kind: 'br', entry: 'slots', total: 36, qualified: 12, matches: 6, labels: ['Phase 1', 'Phase 2', 'Phase 3'] },
+      { key: 'ud2', name: 'Icy Eliminations', path: 'underdog', kind: 'br', from: ['ud1'], total: 12, qualified: 5, matches: 6 },
+      { key: 'wc1', name: 'Wild Card Groups', path: 'wc', kind: 'br', entry: 'wc', total: 48, qualified: 24, matches: 6, labels: ['A', 'B', 'C', 'D'] },
+      { key: 'wc2', name: 'Icy Elims · WC', path: 'wc', kind: 'br', from: ['wc1'], total: 24, qualified: 10, matches: 6, seed: 'pairs', pairs: [[0, 1], [2, 3]], labels: ['A vs B', 'C vs D'] },
+      { key: 'wz', name: 'Final Warzone', path: 'main', kind: 'paired', from: ['ud2', 'wc2'], total: 18, qualified: 10, matches: 6, seed: 'tiers', labels: ['T1', 'T2', 'T3'] },
+      { key: 'gf', name: 'Grand Final', path: 'main', kind: 'br', from: ['wz'], total: 12, final: true, matches: 12 }] },
+    tvk: { key: 'tvk', label: 'TVK Makkal Champ', stages: [
+      { key: 'r1', name: 'Qualifiers', path: 'underdog', kind: 'br', entry: 'slots', total: 144, qualified: 36, matches: 6 },
+      { key: 'r2', name: 'Play-Ins', path: 'underdog', kind: 'br', from: ['r1'], total: 36, qualified: 6, matches: 6 },
+      { key: 'cs', name: 'ClashSquad Knockout', path: 'wc', kind: 'cs', entry: 'wc', total: 12, qualified: 6, matches: 1, bestOf: 1 },
+      { key: 'qf', name: 'Quarter Finals', path: 'main', kind: 'br', from: ['r2', 'cs'], total: 12, qualified: 6, matches: 6 },
+      { key: 'sl', name: 'Semi League', path: 'main', kind: 'br', from: ['qf'], total: 6, qualified: 2, matches: 6 },
+      { key: 'f', name: 'Finals', path: 'main', kind: 'cs', from: ['sl'], total: 2, final: true, matches: 5, bestOf: 5 }] },
+  };
+  const CS_ROUNDS = 4;   // a ClashSquad game is won by the first team to 4 rounds
+  // Defaults merged with the admin's saved numbers: { key: { total, qualified } } (matches come from the template).
+  function templateCounts(tpl, saved) {
+    saved = saved || {};
+    return Object.fromEntries(tpl.stages.map(d => { const v = saved[d.key] || {}, n = (x, def) => Number.isFinite(Number(x)) && x !== '' && x != null ? Math.floor(Number(x)) : def;
+      return [d.key, { total: n(v.total, d.total), qualified: d.final ? null : d.kind === 'cs' ? Math.floor(n(v.total, d.total) / 2) : n(v.qualified, d.qualified), matches: d.matches }]; }));   // matches per group are fixed by the template
+  }
+  // How a stage of `total` teams is split. units = standing groups (or ClashSquad pairs); lobbies = rooms.
+  function unitShape(d, total) {
+    total = Math.floor(Number(total) || 0);
+    if (d.kind === 'cs') return total >= 2 && total % 2 === 0 ? { units: total / 2, size: 2, lobbies: total / 2 } : { error: d.name + ': ClashSquad needs an even number of teams (2, 4, 6 …)' };
+    if (d.kind === 'paired') return total >= 6 && total <= 18 && total % 3 === 0 ? { units: 3, size: total / 3, lobbies: 3 } : { error: d.name + ': 3 groups that play in pairs need 6, 9, 12, 15 or 18 teams (a pair of groups must fit one lobby of 12)' };
+    if (total >= 2 && total <= GROUP_SIZE) return { units: 1, size: total, lobbies: 1 };
+    return total > GROUP_SIZE && total % GROUP_SIZE === 0 ? { units: total / GROUP_SIZE, size: GROUP_SIZE, lobbies: total / GROUP_SIZE } : { error: d.name + ': ' + total + ' teams is not a multiple of 12 (or one lobby of 2–12)' };
+  }
+  // One row per template stage, in the same shape as planPath, plus the template fields.
+  function tplPlan(tpl, saved) {
+    const c = templateCounts(tpl, saved);
+    return tpl.stages.map((d, i) => {
+      const total = c[d.key].total, sh = unitShape(d, total), units = sh.units || 1;
+      const inQ = (d.from || []).reduce((a, k) => a + (c[k].qualified || 0), 0);
+      const wcIn = d.entry === 'wc' ? total : d.entry === 'slots' ? 0 : total - inQ;
+      const q = d.final ? null : c[d.key].qualified, r = q == null ? { topN: null, extra: 0 } : d.kind === 'cs' ? { topN: 1, extra: 0 } : qualifyRule(q, units);
+      return { index: i, key: d.key, name: d.name, path: d.path, kind: d.kind, entry: d.entry || null, from: d.from || [], final: !!d.final,
+        entering: total, wcJoin: Math.max(0, wcIn), wcIn, inQ, units, unitSize: sh.size || 0, lobbies: sh.lobbies || 0, sizes: Array(units).fill(sh.size || 0),
+        topN: r.topN, extra: r.extra, fill: r.extra, advancing: q, matches: c[d.key].matches, bestOf: d.bestOf || null,
+        seed: d.seed || 'snake', pairs: d.pairs || null, labels: d.labels || null, mode: d.mode || null, rushTarget: d.rushTarget || null, shapeError: sh.error || null };
+    });
+  }
+  // Plain-English problems with a template's numbers; empty = it works. locked: stage keys already generated (skipped).
+  // done: stage keys already finished (their qualifiers are approved). A generated but unfinished stage still checks its
+  // Qualified number, since that can change until its qualifiers are approved.
+  function checkTemplate(tpl, saved, locked, done) {
+    locked = locked || new Set(); done = done || new Set(); const errs = [], rows = tplPlan(tpl, saved);
+    rows.forEach(r => {
+      if (done.has(r.key)) return;
+      if (locked.has(r.key)) {
+        if (!r.final && r.kind !== 'cs' && (!(r.advancing >= r.units) || r.advancing >= r.entering)) errs.push(r.name + ': qualified teams must be between ' + r.units + ' (one per group) and ' + (r.entering - 1));
+        if (r.wcIn < 0) errs.push(r.name + ': ' + r.entering + ' teams but ' + r.inQ + ' qualify into it');
+        return;
+      }
+      if (r.shapeError) { errs.push(r.shapeError); return; }
+      if (r.entry === 'slots' && r.entering < 2) errs.push(r.name + ': needs at least 2 teams');
+      if (!r.final && r.kind !== 'cs') {
+        if (!(r.advancing >= 1) || r.advancing >= r.entering) errs.push(r.name + ': qualified teams must be at least 1 and fewer than ' + r.entering);
+        else if (r.advancing < r.units) errs.push(r.name + ': at least 1 team must qualify from each of its ' + r.units + ' groups (' + r.units + ' or more)');
+      }
+      if (r.final && r.kind === 'cs' && r.entering !== 2) errs.push(r.name + ': a ClashSquad final is exactly 2 teams');
+      if (r.final && r.kind === 'br' && r.lobbies !== 1) errs.push(r.name + ': the final must be one lobby (2–12 teams)');
+      if (r.wcIn < 0) errs.push(r.name + ': ' + r.entering + ' teams but ' + r.inQ + ' qualify into it');
+    });
+    return errs;
+  }
+  // Round robin of group pairs for a paired stage: [[0,1],[1,2],[0,2]] for 3 groups.
+  function pairLobbies(n) { const out = []; for (let gap = 1; gap < n; gap++) for (let a = 0; a + gap < n; a++) out.push([a, a + gap]); return n === 3 ? [[0, 1], [1, 2], [0, 2]] : out; }
+  // Tiers: seed order fills Tier 1 first (the best `size` teams), then Tier 2 …
+  function tierAllocate(ids, n) { const size = Math.ceil(ids.length / n); return Array.from({ length: n }, (_, i) => ids.slice(i * size, (i + 1) * size)); }
+  // Merge the qualifiers of source groups into target groups: pairs [[0,1],[2,3]] → group 1 = sources 1+2 …
+  function pairsAllocate(bySource, pairs) { return pairs.map(p => p.flatMap(i => bySource[i] || [])); }
+  // Top N of every unit (best points first), then the best next-placed teams until `target`. rowsLists: standings per unit.
+  function qualifyFromUnits(rowsLists, target) {
+    const seeded = [], order = (a, b) => (b.wins || 0) - (a.wins || 0) || b.points - a.points || b.booyahs - a.booyahs || b.placePts - a.placePts || b.kills - a.kills;
+    const depth = Math.max(0, ...rowsLists.map(l => l.length));
+    for (let r = 0; r < depth && seeded.length < target; r++)
+      rowsLists.map(list => list[r]).filter(Boolean).sort(order).forEach(x => { if (seeded.length < target) seeded.push(x.teamId); });
+    return seeded;
+  }
+  // ClashSquad: one game = { teamId: { rounds, kills } } for the 2 teams. Valid when exactly one team reached 4 rounds.
+  function csGame(res, teamIds, roundsToWin) {
+    roundsToWin = roundsToWin || CS_ROUNDS; const errors = [];
+    const [a, b] = teamIds, ra = Number(res && res[a] && res[a].rounds), rb = Number(res && res[b] && res[b].rounds);
+    if (!Number.isInteger(ra) || !Number.isInteger(rb) || ra < 0 || rb < 0 || ra > roundsToWin || rb > roundsToWin) errors.push('Rounds won must be 0 to ' + roundsToWin);
+    else if ((ra === roundsToWin) === (rb === roundsToWin)) errors.push('Exactly one team must win ' + roundsToWin + ' rounds');
+    return { winner: errors.length ? null : ra === roundsToWin ? a : b, errors };
+  }
+  // A pair over best-of-N games: decided once a team has won more than half.
+  function csTie(teamIds, games, bestOf) {
+    const wins = Object.fromEntries(teamIds.map(id => [id, 0])), need = Math.ceil((bestOf || 1) / 2);
+    (games || []).forEach(g => { const w = csGame(g, teamIds).winner; if (w) wins[w]++; });
+    const winner = teamIds.find(id => wins[id] >= need) || null;
+    return { wins, winner, decided: !!winner, need };
+  }
+  // Rows for a ClashSquad pair (same fields as standings, plus wins and rounds), winner first.
+  function csRows(teamIds, games, bestOf) {
+    const t = csTie(teamIds, games, bestOf), rows = teamIds.map(id => ({ teamId: id, wins: t.wins[id], rounds: 0, roundsLost: 0, points: 0, placePts: 0, kills: 0, booyahs: 0, played: 0, noShows: 0 }));
+    const by = Object.fromEntries(rows.map(r => [r.teamId, r]));
+    (games || []).forEach(g => teamIds.forEach((id, i) => { const me = g && g[id], op = g && g[teamIds[1 - i]]; if (!me) return; by[id].played++; by[id].rounds += me.rounds | 0; by[id].roundsLost += (op && op.rounds) | 0; by[id].kills += me.kills | 0; }));
+    rows.forEach(r => { r.points = r.wins; r.booyahs = r.wins; });
+    rows.sort((x, y) => (t.winner ? (y.teamId === t.winner) - (x.teamId === t.winner) : 0) || y.wins - x.wins || (y.rounds - y.roundsLost) - (x.rounds - x.roundsLost) || y.kills - x.kills);
+    rows.forEach((r, i) => r.rank = i + 1);
+    return rows;
+  }
+
   const api = { GROUP_SIZE, FINAL_TEAMS, MERGE_MAX, STAGE1_TOP, LATER_TOP, PLACEMENT_POINTS, POINTS_PER_KILL, MATCHES, FINAL_MATCHES,
-    distribute, planStages, slotsOk, checkPlan, qualifyRule, planPath, checkPath, suggestPath, spreadPath, defaultWcStage, defaultStageName, cleanStageName, matchPoints, standings, snakeAllocate, sequentialAllocate, shuffle, validateTeam, validateOcrResult, playerStandings, foldName, plainName, teamTag, matchName, matchReadings, editRatio, teamMatch, assignTeams, nameMatches, sameNames };
+    distribute, planStages, slotsOk, checkPlan, qualifyRule, planPath, checkPath, suggestPath, spreadPath, defaultWcStage, defaultStageName, cleanStageName, matchPoints, standings, snakeAllocate, sequentialAllocate, shuffle, validateTeam, validateOcrResult, playerStandings, foldName, plainName, teamTag, matchName, matchReadings, editRatio, teamMatch, assignTeams, nameMatches, sameNames,
+    TEMPLATES, CS_ROUNDS, templateCounts, unitShape, tplPlan, checkTemplate, pairLobbies, tierAllocate, pairsAllocate, qualifyFromUnits, csGame, csTie, csRows };
   if (typeof module !== 'undefined') module.exports = api; else root.Engine = api;
 })(this);
