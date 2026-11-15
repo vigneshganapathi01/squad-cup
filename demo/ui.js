@@ -92,17 +92,62 @@
     }
     document.documentElement.classList.toggle('hero-cd', has);
   }
-  var PROMO_ID = 'Jq2aIyjWWlQ'; // "Booyah Pass S47 - Stellar Scorpions | Free Fire Official" (Garena Free Fire Global)
+  // ---- Before the start: overview layout under the tabs (from the owner's sketch) ----
+  //   [ Tournament overview        ][ Organiser & sponsors ]
+  //   [ About the organiser (full width)                   ]
+  //   [ Ad banner (wide, 8:3)                              ]
+  // Placeholder copy below is UI-only until the logic side adds real fields (sponsors, about text) to Settings.
+  var ABOUT = 'A community esports organiser running Free Fire tournaments for Indian squads: fair rooms, '
+    + 'published points tables and quick payouts. Room IDs and passwords go out on WhatsApp before each match.';
+  var SPONSOR_SLOTS = 3;
+  var AD = {
+    eyebrow: 'Garena Free Fire',
+    title: 'New season is live',
+    sub: 'Watch the latest official Free Fire trailer.',
+    cta: 'Watch trailer',
+    href: 'https://www.youtube.com/watch?v=Jq2aIyjWWlQ' // "Booyah Pass S47 - Stellar Scorpions | Free Fire Official" (Garena Free Fire Global)
+  };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function day(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
   function promo() {
-    // first thing under the tabs while the countdown sits in the hero
     var col = document.querySelector('#app .th-cd') && document.querySelector('#app .grid.ov>div:first-child');
-    if (!col || (col.firstElementChild && col.firstElementChild.classList.contains('promo'))) return;
+    if (!col || (col.firstElementChild && col.firstElementChild.classList.contains('ov-pre'))) return;
+    var st = (typeof S !== 'undefined' && S && S.settings) || {};
+    var org = st.organiser || 'Organiser';
+    var facts = [
+      ['Game', 'Free Fire · Squad (4 players)'],
+      ['Teams', (st.slots || '—') + ' slots'],
+      ['Entry', 'Free'],
+      ['Prize pool', st.prize || 'Free entry'],
+      ['Registration closes', day(st.regCloses)],
+      ['Starts', day(st.startDate) + ' · 6:00 PM IST']
+    ];
     var box = document.createElement('div');
-    box.className = 'card promo';
-    box.innerHTML = '<div class="row between"><div class="eyebrow">Featured · Free Fire</div><span class="promo-tag">Ad</span></div>' +
-      '<div class="promo-frame"><iframe src="https://www.youtube-nocookie.com/embed/' + PROMO_ID + '?rel=0&modestbranding=1&playsinline=1"' +
-      ' title="Free Fire official trailer" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"' +
-      ' allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>';
+    box.className = 'ov-pre';
+    box.innerHTML =
+      '<div class="ov-row">' +
+        '<section class="card ov-card"><h3 class="ov-h">Tournament overview</h3>' +
+          '<p class="ov-lead">' + esc(st.name || '') + ' is a free-to-enter Free Fire squad tournament. Register your team of four, '
+            + 'play the group stages and fight through to the final.</p>' +
+          '<dl class="ov-facts">' + facts.map(function (f) { return '<div><dt>' + f[0] + '</dt><dd>' + esc(f[1]) + '</dd></div>'; }).join('') + '</dl>' +
+          '<div class="ov-links">' + (st.regOpen ? '<a class="btn small" href="#/register">Register your team</a>' : '') + '<a class="btn ghost small" href="#/info">Rules &amp; points</a></div>' +
+        '</section>' +
+        '<section class="card ov-card ov-org"><h3 class="ov-h">Organiser &amp; sponsors</h3>' +
+          '<div class="ov-org-main"><img src="art/dj-esports.webp" alt=""><div><span>Organised by</span><b>' + esc(org) + '</b></div></div>' +
+          '<div class="ov-sub">Sponsors</div>' +
+          '<div class="ov-sponsors">' + Array(SPONSOR_SLOTS + 1).join('<div class="ov-slot">Sponsor slot</div>') + '</div>' +
+          '<p class="ov-note">Sponsor this tournament: contact the organiser.</p>' +
+        '</section>' +
+      '</div>' +
+      '<section class="card ov-card ov-about"><h3 class="ov-h">About ' + esc(org) + '</h3>' +
+        '<div class="ov-about-in"><img src="art/dj-esports.webp" alt=""><p>' + esc(ABOUT) + '</p></div>' +
+        '<div class="ov-tags"><span>Free Fire</span><span>India</span><span>Squad tournaments</span><span>Community</span></div>' +
+      '</section>' +
+      '<a class="ov-ad" href="' + AD.href + '" target="_blank" rel="noopener noreferrer" aria-label="' + esc(AD.title + ': ' + AD.cta) + ' (opens YouTube)">' +
+        '<span class="ov-ad-tag">Ad</span>' +
+        '<span class="ov-ad-in"><span class="ov-ad-eb">' + esc(AD.eyebrow) + '</span><span class="ov-ad-t">' + esc(AD.title) + '</span>' +
+        '<span class="ov-ad-s">' + esc(AD.sub) + '</span><span class="btn small ov-ad-cta">' + esc(AD.cta) + ' ↗</span></span>' +
+      '</a>';
     col.insertBefore(box, col.firstChild);
   }
   var _decorate = decorate;

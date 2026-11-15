@@ -1902,3 +1902,46 @@ html.hero-cd .card.promo{margin-top:0}
 @media(max-width:760px){.dash-head{min-height:0}.dash-head::before{right:-30px;opacity:.35}.dash-head::after{display:none}}
 /* phones/tablets: the admin menu is one horizontal row; keep its items at their natural height */
 @media(max-width:900px){.side{align-items:center!important;height:auto!important;min-height:0!important;max-height:none!important}.side a{flex:none!important;height:auto!important;white-space:nowrap}.side a.on::after{display:none}.side a.on em{margin-right:0}}
+/* ===== Before the start: overview layout under the tabs (owner's sketch) — built by ui.js ===== */
+.ov-pre{display:grid;gap:18px}
+.ov-row{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:18px}
+.ov-card{padding:22px 24px!important;margin:0!important}
+.ov-h{display:flex;align-items:center;gap:10px;margin:0 0 14px!important;font:500 15px/1.2 var(--display)!important;letter-spacing:.1em;text-transform:uppercase}
+.ov-h::before{content:"";width:3px;height:16px;border-radius:2px;background:var(--accent)}
+.ov-lead{margin:0 0 18px;color:var(--ink-2,#c9cbe0);line-height:1.6;max-width:62ch}
+.ov-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin:0 0 18px;border:1px solid var(--glass-line);border-radius:10px;overflow:hidden;background:var(--glass-line)}
+.ov-facts div{padding:12px 14px;background:rgba(14,15,30,.72)}
+.ov-facts dt{font:500 11.5px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.ov-facts dd{margin:0;font:500 15px/1.3 var(--display);color:#fff}
+.ov-links{display:flex;gap:10px;flex-wrap:wrap}
+.ov-org{display:flex;flex-direction:column}
+.ov-org-main{display:flex;align-items:center;gap:14px;padding:14px;border-radius:10px;background:rgba(var(--acc-rgb),.1);border:1px solid rgba(var(--acc-rgb),.28)}
+.ov-org-main img{width:58px;height:58px;object-fit:contain;flex:none}
+.ov-org-main span{display:block;font-size:12px;color:var(--muted);letter-spacing:.04em}
+.ov-org-main b{display:block;font:500 18px/1.25 var(--display);color:#fff;margin-top:3px}
+.ov-sub{margin:18px 0 10px;font:500 11.5px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ov-sponsors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ov-slot{display:grid;place-items:center;min-height:64px;padding:8px;border:1px dashed rgba(255,255,255,.18);border-radius:8px;font-size:12px;color:var(--muted);text-align:center}
+.ov-note{margin:auto 0 0;padding-top:14px;font-size:13px;color:var(--muted)}
+.ov-about-in{display:flex;align-items:center;gap:18px}
+.ov-about-in img{width:72px;height:72px;object-fit:contain;flex:none}
+.ov-about-in p{margin:0;line-height:1.65;color:var(--ink-2,#c9cbe0);max-width:90ch}
+.ov-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.ov-tags span{padding:6px 12px;border-radius:999px;border:1px solid var(--glass-line);font-size:12.5px;color:var(--ink-2,#c9cbe0);background:rgba(255,255,255,.03)}
+/* ad banner: wide 8:3 like a store hero banner, not 16:9 */
+.ov-ad{position:relative;display:flex;align-items:center;aspect-ratio:8/3;border-radius:14px;overflow:hidden;text-decoration:none!important;color:#fff!important;
+  border:1px solid var(--glass-line);background:#0b0c18;isolation:isolate}
+.ov-ad::after{content:"";position:absolute;z-index:-2;top:0;right:0;height:100%;aspect-ratio:1480/990;background:url(art/ad-ff.webp) center/cover no-repeat;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 38%);mask-image:linear-gradient(90deg,transparent 0,#000 38%)}
+.ov-ad::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(11,12,24,.6) 0%,rgba(11,12,24,.25) 45%,rgba(11,12,24,0) 65%),radial-gradient(60% 90% at 0% 100%,rgba(var(--acc-rgb),.25),transparent 70%)}
+.ov-ad-in{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:0 clamp(22px,5vw,64px);max-width:560px}
+.ov-ad-eb{font:500 12px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-text)}
+.ov-ad-t{font:500 clamp(28px,4vw,52px)/1.05 var(--display);letter-spacing:.01em}
+.ov-ad-s{font-size:clamp(14px,1.4vw,18px);color:rgba(255,255,255,.82)}
+.ov-ad-cta{margin-top:6px}
+.ov-ad:hover .ov-ad-cta{filter:brightness(1.12)}
+.ov-ad:focus-visible{outline:2px solid var(--accent-text);outline-offset:3px}
+.ov-ad-tag{position:absolute;top:14px;right:14px;font:500 11px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;padding:5px 8px;border-radius:4px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.8)}
+@media(max-width:900px){.ov-row{grid-template-columns:minmax(0,1fr)}.ov-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.ov-card{padding:18px!important}.ov-about-in{align-items:flex-start}.ov-about-in img{width:52px;height:52px}
+  .ov-ad{aspect-ratio:auto;min-height:220px}.ov-ad::after{width:100%;aspect-ratio:auto;-webkit-mask-image:none;mask-image:none;background-position:65% center}.ov-ad::before{background:linear-gradient(90deg,rgba(11,12,24,.95),rgba(11,12,24,.55))}}
