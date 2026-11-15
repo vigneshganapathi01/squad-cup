@@ -1705,3 +1705,27 @@ select[data-act=ocrMatch]{min-width:260px}
 .path-row { box-sizing: border-box; grid-template-columns: minmax(58px, 1fr) 80px 56px 28px; gap: 4px 8px; } .path-row > b { white-space: nowrap; font-size: 12px; } .path-row input { padding-left: 8px; padding-right: 4px; }
 .path-row { grid-template-columns: minmax(84px, 1fr) 70px 50px 28px; } .path-row .sn input { font-weight: 600; padding-left: 8px; padding-right: 4px; } .path-row .sn input::placeholder { color: var(--ink, #eee); opacity: .75; }
 .ocr-exact { margin-top: 4px; font-weight: 600; color: var(--ink, #eee); font-size: 13px; word-break: break-word; }
+/* ===== Map cards: blend the text side with the page navy (no pure black), subtle dark wash over the map side ===== */
+.mcard[data-map="alpine"]::before{background-image:
+  linear-gradient(90deg,rgba(30,34,53,.97) 0%,rgba(30,34,53,.92) 30%,rgba(30,34,53,.6) 50%,rgba(30,34,53,.18) 70%,rgba(30,34,53,.08) 100%),
+  linear-gradient(90deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.28) 100%),
+  url(art/maps/alpine.webp)!important;background-size:auto,auto,cover!important;background-position:0 0,0 0,right center!important}
+.mcard.is-live[data-map]::before{box-shadow:none!important}
+.mcard.is-live{background:linear-gradient(#1e2235,#1e2235) padding-box,
+    conic-gradient(from var(--live-ang),rgba(255,255,255,.10) 0deg,rgba(255,255,255,.10) 230deg,rgba(255,255,255,.55) 290deg,#fff 330deg,rgba(255,255,255,.10) 360deg) border-box!important}
+.mcard{box-shadow:inset 0 1px 0 var(--glass-hi),0 8px 22px rgba(10,12,24,.28)!important}
+/* ===== Prize pool card (right column): gold chip on its own line, link underneath ===== */
+.prize-card .prize{display:block!important;width:fit-content!important;max-width:100%}
+.prize-card a.small{display:inline-block;margin-top:2px}
+/* ===== New screens from main (OCR upload, dashboard results, stage editor) brought into the theme ===== */
+.path-row{background:rgba(255,255,255,.02);border-color:var(--glass-line)!important;border-radius:6px}
+.path-row.final,.wc-opt{border-color:rgba(var(--acc-rgb),.45)!important}
+.wc-opt{background:rgba(var(--acc-rgb),.05)}
+.ocr-slot{background:rgba(13,15,27,.35)!important;border-color:var(--glass-line)!important;border-radius:8px}
+.ocr-slot:hover,.ocr-slot.has{border-color:rgba(var(--acc-rgb),.6)!important}
+.ocr-ph{background:rgba(13,15,27,.55)!important;border-radius:6px;color:var(--muted)}
+.ocr-slot img,.ocr-crop{background:#0d0f1b!important}
+.ocr-table td.ocr-tcell{background:rgba(45,50,69,.55)!important}
+.ocr-table tbody.ocr-grp,.res-table tbody.res-grp{border-top-color:var(--glass-line)!important}
+.ocr-read{font-family:var(--display)!important}
+.dash-results h4{font-family:var(--display);text-transform:uppercase;letter-spacing:.06em}
