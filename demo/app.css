@@ -1852,14 +1852,53 @@ html.pre-start .grid.ov>div:first-child .grid.g2>.card:first-child .eyebrow{just
   background:linear-gradient(115deg,transparent 0 30%,rgba(255,255,255,.75) 30% 46%,transparent 46% 58%,rgba(255,255,255,.4) 58% 74%,transparent 74%)}
 .side a.on svg,html[data-theme] .side a.on svg{fill:#fff!important;filter:drop-shadow(0 0 6px rgba(var(--acc-rgb),.8))}
 .side a.on em{margin-right:28px}
-/* ===== Admin sidebar: stays in view and scrolls on its own when the menu is taller than the window ===== */
+/* ===== Admin sidebar: sticky, full height (top of the greeting to the bottom of the frame).
+   Rows share the height: roomy on tall screens, compact (and scrollable) on short ones.
+   --side-h is set by ui.js from the scroll frame's inner height. ===== */
 @media(min-width:901px){
-  .side{position:sticky!important;top:0!important;max-height:calc(100vh - 230px);overflow-y:auto;overscroll-behavior:contain;
-    scrollbar-width:thin;scrollbar-color:rgba(var(--acc-rgb),.55) transparent}
+  .side{position:sticky!important;top:0!important;align-self:start;height:var(--side-h,calc(100vh - 200px));max-height:none!important;
+    overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(var(--acc-rgb),.5) transparent;
+    padding:14px 12px 12px!important;-webkit-mask-image:none!important;mask-image:none!important}
   .side::-webkit-scrollbar{width:6px}
   .side::-webkit-scrollbar-thumb{background:rgba(var(--acc-rgb),.5);border-radius:6px}
-  .side::-webkit-scrollbar-track{background:transparent}
-  /* soft fade at the bottom edge hints there is more to scroll */
-  .side{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 18px),transparent)}
-  .side-foot{padding-bottom:14px!important}
+  .side a{flex:1 0 auto;min-height:42px!important;max-height:52px;margin:3px 0!important}
+  .side-h{flex:none;padding:20px 12px 8px!important}
+  .side-h:first-of-type{padding-top:4px!important}
+  .side-foot{flex:none;margin-top:auto!important;padding-top:12px!important;padding-bottom:4px!important}
 }
+/* ===== Hero countdown: before the start, ui.js moves the countdown into the stats row
+   (Prize | Slots | Starts in), so the promo below the tabs is visible without scrolling ===== */
+.th-stats.has-cd>div:nth-child(3),.th-stats.has-cd>div:nth-child(4){display:none!important}
+.th-stats>.th-cd{grid-column:span 2;display:flex!important;align-items:center;gap:18px;padding:10px 12px 10px 18px!important}
+.th-stats .th-cd-l{display:flex!important;flex-direction:column;gap:7px;flex:none;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
+.th-stats .th-cd-l b{font:500 14px/1 var(--display)!important;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink-soft)!important}
+.th-stats .th-cd-l span{font-size:12.5px!important;letter-spacing:.04em!important;text-transform:none!important}
+.th-stats .th-cd .cd{flex:1;min-width:0;margin:0!important;gap:8px!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
+.th-stats .th-cd .cd>div{display:flex!important;padding:9px 4px 8px!important;gap:6px!important;background:rgba(0,0,0,.38)!important;border:1px solid var(--glass-line)!important;border-radius:6px!important;box-shadow:none!important;backdrop-filter:none!important}
+.th-stats .th-cd .cd>div::after{top:calc(50% - 9px)}
+.th-stats .th-cd .cd b{font-size:28px!important;line-height:1!important}
+.th-stats .th-cd .cd span{font-size:10.5px!important;letter-spacing:.12em!important}
+html.hero-cd .grid.ov>div:first-child>h2:first-of-type,html.hero-cd .grid.ov>div:first-child>.grid.g2{display:none!important}
+html.hero-cd .card.promo{margin-top:0}
+@media(max-width:700px){.th-stats>.th-cd{flex-direction:column;align-items:stretch;gap:10px;padding:12px!important}.th-stats .th-cd-l{flex-direction:row;justify-content:space-between;align-items:baseline}}
+@media(max-width:560px){.th-stats>div:not(.th-cd) b{font-size:20px!important}.th-stats>div:first-child b{font-size:19px!important}}
+/* ===== Admin dashboard banner: Free Fire character (official render, ff.garena.com) over a violet lightning bolt ===== */
+.dash-head{--cx:max(250px,calc(36% - 80px));position:relative;isolation:isolate;overflow:hidden;align-items:center!important;min-height:150px;padding:24px 28px!important;margin-bottom:20px!important;
+  border-radius:12px;border:1px solid var(--glass-line);
+  background:radial-gradient(60% 130% at 40% 50%,rgba(var(--acc-rgb),.26),transparent 70%),
+    repeating-linear-gradient(115deg,rgba(255,255,255,.025) 0 1px,transparent 1px 14px),
+    linear-gradient(90deg,#121327 0%,#1a1b36 50%,#121327 100%)}
+.dash-head::before{content:"";position:absolute;z-index:-2;left:calc(var(--cx) + 95px);top:-14%;width:220px;height:128%;
+  background:linear-gradient(165deg,#b9adff 0%,var(--accent) 45%,rgba(var(--acc-rgb),.35) 100%);
+  clip-path:polygon(56% 0,100% 0,66% 42%,90% 42%,24% 100%,42% 55%,16% 55%);opacity:.9}
+.dash-head::after{content:"";position:absolute;z-index:-1;left:var(--cx);top:-4px;width:240px;height:240px;
+  background:url(art/ff-banner-char.webp) center top/contain no-repeat;
+  filter:drop-shadow(0 0 18px rgba(var(--acc-rgb),.45));
+  -webkit-mask-image:linear-gradient(180deg,#000 52%,transparent 66%);mask-image:linear-gradient(180deg,#000 52%,transparent 66%)}
+.dash-head>*{position:relative;z-index:1}
+.dash-head h1{margin:2px 0 4px!important}
+.dash-head .row{gap:12px}
+@media(max-width:1100px){.dash-head{--cx:calc(100% - 560px)}}
+@media(max-width:760px){.dash-head{min-height:0}.dash-head::before{right:-30px;opacity:.35}.dash-head::after{display:none}}
+/* phones/tablets: the admin menu is one horizontal row; keep its items at their natural height */
+@media(max-width:900px){.side{align-items:center!important;height:auto!important;min-height:0!important;max-height:none!important}.side a{flex:none!important;height:auto!important;white-space:nowrap}.side a.on::after{display:none}.side a.on em{margin-right:0}}

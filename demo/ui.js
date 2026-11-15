@@ -8,6 +8,16 @@
     var m = document.getElementById('app');
     if (m) { var top = typeof x === 'object' && x ? x.top : y; if (typeof top === 'number') m.scrollTop = top; }
   };
+  // Admin sidebar height = the frame's inner height (greeting top to frame bottom), kept in --side-h for app.css.
+  function sideH() {
+    var m = document.getElementById('app');
+    if (!m) return;
+    var cs = getComputedStyle(m);
+    var h = m.clientHeight - parseFloat(cs.paddingTop) - Math.min(parseFloat(cs.paddingBottom), 18);
+    if (h > 200) document.documentElement.style.setProperty('--side-h', h + 'px');
+  }
+  window.addEventListener('resize', sideH);
+  document.addEventListener('DOMContentLoaded', sideH);
 })();
 
 // UI only: show the registration form (#/register) as a pop-up over the page.
@@ -62,21 +72,41 @@
   setInterval(tick, 1000);
 
   // ---- Promo slot under the countdown (placeholder ad: official Free Fire trailer from YouTube) ----
+  // ---- Hero countdown: move the countdown into the hero stats row (Prize | Slots | Starts in) ----
+  // Matches played / Total kills are always 0 before the start, so the countdown takes their place.
+  function heroCd() {
+    var stats = document.querySelector('#app .th-stats');
+    var cd = document.querySelector('#app .grid.ov .cd[data-cd]');
+    var has = !!document.querySelector('#app .th-cd');
+    if (stats && cd && !has) {
+      var card = cd.closest('.card');
+      var date = card && card.querySelector('.small.muted');
+      var box = document.createElement('div');
+      box.className = 'th-cd';
+      box.innerHTML = '<div class="th-cd-l"><b>Starts in</b><span>' + (date ? date.textContent : '') + '</span></div>';
+      box.appendChild(cd);
+      stats.appendChild(box);
+      stats.classList.add('has-cd');
+      if (card) card.remove();
+      has = true;
+    }
+    document.documentElement.classList.toggle('hero-cd', has);
+  }
   var PROMO_ID = 'Jq2aIyjWWlQ'; // "Booyah Pass S47 - Stellar Scorpions | Free Fire Official" (Garena Free Fire Global)
   function promo() {
-    var cd = document.querySelector('#app .cd[data-cd]');
-    var host = cd && cd.closest('.grid');
-    if (!host || (host.nextElementSibling && host.nextElementSibling.classList.contains('promo'))) return;
+    // first thing under the tabs while the countdown sits in the hero
+    var col = document.querySelector('#app .th-cd') && document.querySelector('#app .grid.ov>div:first-child');
+    if (!col || (col.firstElementChild && col.firstElementChild.classList.contains('promo'))) return;
     var box = document.createElement('div');
     box.className = 'card promo';
     box.innerHTML = '<div class="row between"><div class="eyebrow">Featured · Free Fire</div><span class="promo-tag">Ad</span></div>' +
       '<div class="promo-frame"><iframe src="https://www.youtube-nocookie.com/embed/' + PROMO_ID + '?rel=0&modestbranding=1&playsinline=1"' +
       ' title="Free Fire official trailer" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"' +
       ' allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>';
-    host.parentNode.insertBefore(box, host.nextSibling);
+    col.insertBefore(box, col.firstChild);
   }
   var _decorate = decorate;
-  decorate = function () { _decorate(); tick(); promo(); };
+  decorate = function () { _decorate(); heroCd(); tick(); promo(); };
 
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isReg()) close(); });
   window.addEventListener('hashchange', function () { setTimeout(decorate, 0); });
