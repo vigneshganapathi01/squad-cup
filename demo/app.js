@@ -5,7 +5,7 @@ const MAPS = ['Bermuda', 'Purgatory', 'Kalahari', 'Alpine', 'NeXTerra', 'Bermuda
 
 // ---------- storage ----------
 function fresh() {
-  return { settings: { name: 'Squad Cup', slots: 252, wildCards: 12, regOpen: true, regCloses: '2026-12-20', prize: '₹50,000', organiser: 'Squad Cup Esports', startDate: '2026-12-27' },
+  return { settings: { name: 'Justice Cup Season 2', slots: 252, wildCards: 12, regOpen: true, regCloses: '2026-12-20', prize: '₹50,000', organiser: 'DJ Esports', startDate: '2026-12-27' },
     teams: [], seq: 0, stages: [], log: [], complaints: [], groupLinks: {}, notifications: [], wcInvites: [] };
 }
 let S = (window.Cloud && Cloud.on) ? fresh() : (load(KEY) || fresh());
@@ -255,7 +255,7 @@ function rowsOf(g) {
 }
 // Tournament logo (uploaded in Settings) or the default badge.
 const logoOk = () => /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(S.settings.logo || '');
-const tlogo = cls => logoOk() ? `<img class="${cls} tl-img" src="${S.settings.logo}" alt="${esc(S.settings.name)} logo">` : `<span class="${cls}">SC</span>`;
+const tlogo = cls => logoOk() ? `<img class="${cls} tl-img" src="${S.settings.logo}" alt="${esc(S.settings.name)} logo">` : `<span class="${cls}">JC</span>`;
 function qualifiersOf(stage) {
   // As many teams as the admin's count for the next stage (minus the Wild Cards joining there):
   // all 1st places (best points first), then all 2nd places … then, if the count isn't a whole Top N, the best next-placed teams.
@@ -1316,7 +1316,7 @@ function viewSettings() {
     <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" name="regOpen" ${s.regOpen ? 'checked' : ''}> Registration open</label>
     <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" name="notifyPaused" ${s.notifyPaused ? 'checked' : ''}> Pause captain messages</label>
     <h3 style="margin-top:20px">Tournament logo</h3>
-    <div class="row">${logoOk() ? `<img class="set-logo" src="${s.logo}" alt="Tournament logo">` : '<span class="set-logo none">SC</span>'}
+    <div class="row">${logoOk() ? `<img class="set-logo" src="${s.logo}" alt="Tournament logo">` : '<span class="set-logo none">JC</span>'}
       <div><input type="file" accept="image/png,image/jpeg,image/webp" data-act="tlogo" aria-label="Upload tournament logo"><p class="small muted" style="margin:4px 0 0">PNG, JPG or WEBP. Shown in the header, the hero and the admin panel.${logoOk() ? ' <a href="#" data-act="tlogoRemove">Remove logo</a>' : ''}</p></div></div>
     <h3 style="margin-top:20px">Format</h3>
     <label>Bracket format</label>${formatSelect(s, 'preset')}
@@ -1842,7 +1842,7 @@ document.addEventListener('submit', e => {
     s.path = newPath; s.wcStage = newWc; s.wildCards = wc; s.wcLast = wcCount;
     s.stageNames = newNames; S.stages.forEach(st => { if (shownNames[st.index]) st.name = shownNames[st.index]; });
     { const f2 = FORMATS[fd.get('preset')]; if (f2) { s.stage1Top = f2.stage1Top; s.laterTop = f2.laterTop; } }   // remembered for filling new stages
-    s.name = String(fd.get('name') || 'Squad Cup').trim(); s.regCloses = String(fd.get('regCloses')); s.prize = String(fd.get('prize') || '').trim(); s.organiser = String(fd.get('organiser') || '').trim(); s.startDate = String(fd.get('startDate') || '');
+    s.name = String(fd.get('name') || 'Justice Cup Season 2').trim(); s.regCloses = String(fd.get('regCloses')); s.prize = String(fd.get('prize') || '').trim(); s.organiser = String(fd.get('organiser') || '').trim(); s.startDate = String(fd.get('startDate') || '');
     if (Cloud.on) { s.emailFrom = String(fd.get('emailFrom') || '').trim(); s.emailName = String(fd.get('emailName') || '').trim(); s.siteUrl = location.origin; }
     s.regOpen = !!fd.get('regOpen'); s.notifyPaused = !!fd.get('notifyPaused');
     { const num = (k, d, max) => { const v = Math.floor(Number(fd.get(k))); return v >= 1 && v <= max ? v : d; };

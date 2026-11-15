@@ -3,7 +3,7 @@
 (function seedDemo() {
   if (Cloud.on || S.teams.length) return;   // never touches a live database or existing demo data
   loadSample();
-  S.settings.prize = '₹50,000'; S.settings.organiser = 'Squad Cup Esports';
+  S.settings.prize = '₹50,000'; S.settings.organiser = 'DJ Esports';
   const thunder = S.teams.find(t => t.code === 'FF-0001').id;
   // Results that keep Team Thunder (the demo team) in the running.
   const play = ids => {
@@ -40,7 +40,7 @@
   // Team Thunder's next match: checked in, room released.
   const m4 = tg.matches[3];
   Object.assign(m4, { status: 'room', roomId: '5566778', roomPass: 'sq4d', checkins: tg.teamIds.slice() });
-  tg.teamIds.forEach(id => notify(id, 'room', m4.id, `Squad Cup · Stage 4 Group ${tg.label} Match 4 (${m4.map}, ${m4.time})\nRoom ID: 5566778\nPassword: sq4d`));
+  tg.teamIds.forEach(id => notify(id, 'room', m4.id, `${S.settings.name} · Stage 4 Group ${tg.label} Match 4 (${m4.map}, ${m4.time})\nRoom ID: 5566778\nPassword: sq4d`));
   // One match live, one result waiting for the admin.
   Object.assign(others[0].matches[3], { status: 'live', roomId: '1122334', roomPass: 'ff44', checkins: others[0].teamIds.slice() });
   Object.assign(others[1].matches[3], { status: 'completed', checkins: others[1].teamIds.slice(), results: randomResults(others[1].teamIds), screenshots: ['g' + others[1].label + '-m4.png'], resultStatus: 'submitted' });
@@ -49,7 +49,7 @@
   S.groupLinks[k] = { link: 'https://chat.whatsapp.com/DemoStage4Group' + tg.label, invites: {} };
   tg.teamIds.forEach((id, i) => {
     S.groupLinks[k].invites[id] = i < 5 ? 'joined' : i < 9 ? 'sent' : 'pending';
-    notify(id, 'invite', k, `Squad Cup · Stage 4: join your Group ${tg.label} WhatsApp group: ${S.groupLinks[k].link}`);
+    notify(id, 'invite', k, `${S.settings.name} · Stage 4: join your Group ${tg.label} WhatsApp group: ${S.groupLinks[k].link}`);
   });
   // An open complaint for the admin to answer.
   // A made-up end-of-match screenshot so the admin can see how complaint images look.
